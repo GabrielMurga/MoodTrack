@@ -1,0 +1,57 @@
+[project]
+name = "moodtrack"
+version = "0.1.0"
+description = "Plataforma de acompanhamento contínuo da saúde mental para psicólogos e pacientes."
+requires-python = ">=3.11,<3.12"
+readme = "README.md"
+license = { text = "Proprietary" }
+authors = [
+    { name = "Gabriel Losekann" },
+]
+dependencies = [
+    "django>=5.0,<5.2",
+    "djangorestframework>=3.15,<3.16",
+    "psycopg[binary]>=3.2,<4",
+    "django-allauth[socialaccount]>=65,<66",
+    "django-environ>=0.11,<0.12",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.6,<0.7",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = [
+    "*/migrations/*",
+    ".venv",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "W",    # pycodestyle warnings
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific
+    "DJ",   # flake8-django
+]
+ignore = [
+    "E501",  # gerenciado por formatter
+]
+
+[tool.ruff.lint.per-file-ignores]
+"config/settings/*.py" = ["F405", "F403"]
+"tests/**/*.py" = ["B011"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

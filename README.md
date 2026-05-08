@@ -22,6 +22,33 @@ Plataforma de acompanhamento contínuo da saúde mental que conecta psicólogos 
 - **IA:** Anthropic Claude API com pseudonimização via spaCy + Microsoft Presidio
 - **Auth:** OAuth Google (django-allauth)
 
+## Quickstart (desenvolvimento)
+
+Pré-requisitos: [uv](https://docs.astral.sh/uv/), Docker Desktop, Python 3.11.
+
+```bash
+# 1. Instalar dependências (cria .venv automaticamente)
+uv sync
+
+# 2. Subir Postgres + Redis
+docker compose up -d
+
+# 3. Configurar variáveis de ambiente
+cp .env.example .env  # edite SECRET_KEY se quiser
+
+# 4. Aplicar migrations e iniciar o servidor
+uv run python manage.py migrate
+uv run python manage.py runserver
+```
+
+Comandos úteis:
+
+```bash
+uv run ruff check .          # lint
+uv run ruff format .         # format
+uv run python manage.py check  # validar configuração Django
+```
+
 ## Princípios
 
 1. Cuidado humano em primeiro lugar — a tecnologia serve à relação terapêutica, não a substitui.
