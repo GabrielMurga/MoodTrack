@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Calendário de humor — MoodTrack{% endblock %}
+
+{% block content %}
+<h1>Calendário de humor</h1>
+<p style="color: #666;">Toque rápido. Sem texto. Para registrar pensamentos ou acontecimentos, vá em <a href="{% url 'journal:patient_journal_list' %}">Diário</a>.</p>
+
+<p style="margin: 1.5rem 0;">
+  <a href="{% url 'journal:patient_mood_create' %}"><button>+ Como estou agora?</button></a>
+</p>
+
+{% if not logs %}
+  <p>Nenhum registro ainda.</p>
+{% endif %}
+
+{% for log in logs %}
+  <div class="card" style="display: flex; align-items: center; gap: 0.8rem;">
+    <strong style="font-size: 1.05rem;">{{ log.get_mood_display }}</strong>
+    <span class="spacer" style="flex: 1;"></span>
+    <small style="color: #666;">{{ log.recorded_at|date:"d/m/Y H:i" }}</small>
+    <form method="post" action="{% url 'journal:patient_mood_toggle_share' log.id %}" class="inline">
+      {% csrf_token %}
+      {% if log.is_shared_with_psychologist %}
+        <button type="submit" title="Tornar privado">Compartilhado ✓</button>
+      {% else %}
+        <button type="submit" title="Compartilhar">Privado</button>
+      {% endif %}
+    </form>
+  </div>
+{% endfor %}
+{% endblock %}

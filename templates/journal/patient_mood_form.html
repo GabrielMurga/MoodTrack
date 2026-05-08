@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Como estou agora — MoodTrack{% endblock %}
+
+{% block content %}
+<h1>Como estou agora?</h1>
+
+<form method="post">
+  {% csrf_token %}
+
+  <fieldset style="border: 1px solid #ddd; border-radius: 6px; padding: 0.8rem 1rem; margin-bottom: 1rem;">
+    {{ form.mood }}
+    {% if form.mood.errors %}
+      <ul class="messages">{% for e in form.mood.errors %}<li class="error">{{ e }}</li>{% endfor %}</ul>
+    {% endif %}
+  </fieldset>
+
+  <p>
+    <label>
+      {{ form.is_shared_with_psychologist }}
+      Compartilhar com meu psicólogo
+    </label>
+  </p>
+
+  <button type="submit">Registrar</button>
+  <a href="{% url 'journal:patient_mood_list' %}">Cancelar</a>
+</form>
+{% endblock %}

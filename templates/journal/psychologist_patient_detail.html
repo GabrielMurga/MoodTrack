@@ -2,30 +2,63 @@
 {% block title %}{{ patient.user.email }} — MoodTrack{% endblock %}
 
 {% block content %}
-<p><a href="{% url 'journal:psychologist_patients' %}">← Voltar para pacientes</a></p>
+<p><a href="{% url 'journal:psychologist_patients' %}">← Voltar</a></p>
 
 <h1>{{ patient.user.get_full_name }}</h1>
 <p style="color: #666;">{{ patient.user.email }} · vínculo desde {{ bond.psychologist_confirmed_at|date:"d/m/Y" }}</p>
 
-<h2 style="margin-top: 2rem;">Registros compartilhados</h2>
+<h2 style="margin-top: 2rem;">Anotações clínicas</h2>
+<p>
+  <a href="{% url 'journal:clinical_note_create' patient.id %}"><button>+ Nova anotação</button></a>
+</p>
+{% if not clinical_notes %}
+  <p style="color: #666;">Você ainda não fez anotações sobre este paciente.</p>
+{% endif %}
+{% for note in clinical_notes %}
+  <div class="card">
+    <div style="display: flex; align-items: center; gap: 0.6rem;">
+      <strong>{% if note.session_date %}Sessão {{ note.session_date|date:"d/m/Y" }}{% else %}Anotação{% endif %}</strong>
+      <span class="spacer" style="flex: 1;"></span>
+      <small style="color: #666;">criada {{ note.created_at|date:"d/m/Y H:i" }}</small>
+      <a href="{% url 'journal:clinical_note_edit' note.id %}">Editar</a>
+    </div>
+    <p style="margin-top: 0.6rem; white-space: pre-wrap;">{{ note.content }}</p>
+  </div>
+{% endfor %}
 
-{% if not entries %}
+<h2 style="margin-top: 2rem;">Registros compartilhados pelo paciente</h2>
+
+<h3>Humor (calendário compartilhado)</h3>
+{% if not mood_logs %}
+  <p style="color: #666;">Nenhum registro de humor compartilhado.</p>
+{% endif %}
+{% for log in mood_logs %}
+  <div class="card" style="display: flex; gap: 0.8rem; align-items: center;">
+    <strong>{{ log.get_mood_display }}</strong>
+    <span class="spacer" style="flex: 1;"></span>
+    <small style="color: #666;">{{ log.recorded_at|date:"d/m/Y H:i" }}</small>
+  </div>
+{% endfor %}
+
+<h3 style="margin-top: 1.5rem;">Diário (eventos compartilhados)</h3>
+{% if not journal_entries %}
   <p style="color: #666;">
-    O paciente ainda não compartilhou nenhum registro. Apenas registros que ele
+    O paciente ainda não compartilhou nenhuma entrada. Apenas registros que ele
     explicitamente marcou como compartilhados aparecem aqui.
   </p>
 {% endif %}
-
-{% for entry in entries %}
+{% for entry in journal_entries %}
   <div class="card">
     <div style="display: flex; align-items: center; gap: 0.6rem;">
-      <strong style="font-size: 1.05rem;">{{ entry.get_mood_display }}</strong>
+      <strong>{{ entry.get_kind_display }}</strong>
+      {% if entry.title %}<span>· {{ entry.title }}</span>{% endif %}
+      {% if entry.mood %}
+        <span class="status-badge">{{ entry.get_mood_display }}</span>
+      {% endif %}
       <span class="spacer" style="flex: 1;"></span>
       <small style="color: #666;">{{ entry.created_at|date:"d/m/Y H:i" }}</small>
     </div>
-    {% if entry.content %}
-      <p style="margin-top: 0.6rem; white-space: pre-wrap;">{{ entry.content }}</p>
-    {% endif %}
+    <p style="margin-top: 0.6rem; white-space: pre-wrap;">{{ entry.content }}</p>
   </div>
 {% endfor %}
 {% endblock %}

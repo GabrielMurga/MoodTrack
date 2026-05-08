@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Diário — MoodTrack{% endblock %}
+
+{% block content %}
+<h1>Diário</h1>
+<p style="color: #666;">Acontecimentos, pensamentos, sonhos, reflexões. Para registrar só o humor (sem texto), use o <a href="{% url 'journal:patient_mood_list' %}">calendário de humor</a>.</p>
+
+<p style="margin: 1.5rem 0;">
+  <a href="{% url 'journal:patient_journal_create' %}"><button>+ Nova entrada</button></a>
+</p>
+
+{% if not entries %}
+  <p>Nenhuma entrada ainda.</p>
+{% endif %}
+
+{% for entry in entries %}
+  <div class="card">
+    <div style="display: flex; align-items: center; gap: 0.6rem;">
+      <strong>{{ entry.get_kind_display }}</strong>
+      {% if entry.title %}<span>· {{ entry.title }}</span>{% endif %}
+      {% if entry.mood %}
+        <span class="status-badge">{{ entry.get_mood_display }}</span>
+      {% endif %}
+      {% if entry.is_shared_with_psychologist %}
+        <span class="status-badge status-active">Compartilhado</span>
+      {% else %}
+        <span class="status-badge">Privado</span>
+      {% endif %}
+      <span class="spacer" style="flex: 1;"></span>
+      <small style="color: #666;">{{ entry.created_at|date:"d/m/Y H:i" }}</small>
+    </div>
+
+    <p style="margin-top: 0.6rem; white-space: pre-wrap;">{{ entry.content }}</p>
+
+    <div style="margin-top: 0.6rem; display: flex; gap: 0.5rem;">
+      <a href="{% url 'journal:patient_journal_edit' entry.id %}"><button type="button">Editar</button></a>
+      <form method="post" action="{% url 'journal:patient_journal_toggle_share' entry.id %}" class="inline">
+        {% csrf_token %}
+        {% if entry.is_shared_with_psychologist %}
+          <button type="submit">Tornar privado</button>
+        {% else %}
+          <button type="submit">Compartilhar</button>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+{% endfor %}
+{% endblock %}

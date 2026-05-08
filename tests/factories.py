@@ -12,6 +12,13 @@ from factory.django import DjangoModelFactory
 
 from apps.accounts.models import PatientProfile, PsychologistProfile, User
 from apps.bonds.models import Bond, BondStatus
+from apps.journal.models import (
+    ClinicalNote,
+    JournalEntry,
+    JournalEntryKind,
+    MoodLevel,
+    MoodLog,
+)
 
 
 class UserFactory(DjangoModelFactory):
@@ -67,3 +74,33 @@ class BondFactory(DjangoModelFactory):
             status=BondStatus.ENDED,
             ended_at=factory.Faker("date_time_this_month", tzinfo=datetime.UTC),
         )
+
+
+class MoodLogFactory(DjangoModelFactory):
+    class Meta:
+        model = MoodLog
+
+    patient = factory.SubFactory(PatientProfileFactory)
+    mood = MoodLevel.NEUTRAL
+    is_shared_with_psychologist = False
+
+
+class JournalEntryFactory(DjangoModelFactory):
+    class Meta:
+        model = JournalEntry
+
+    patient = factory.SubFactory(PatientProfileFactory)
+    kind = JournalEntryKind.SITUATION
+    title = ""
+    content = factory.Faker("paragraph", locale="pt_BR")
+    mood = None
+    is_shared_with_psychologist = False
+
+
+class ClinicalNoteFactory(DjangoModelFactory):
+    class Meta:
+        model = ClinicalNote
+
+    bond = factory.SubFactory(BondFactory, active=True)
+    content = factory.Faker("paragraph", locale="pt_BR")
+    session_date = None

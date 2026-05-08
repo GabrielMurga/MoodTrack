@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}{% if mode == "create" %}Nova entrada{% else %}Editar{% endif %} — MoodTrack{% endblock %}
+
+{% block content %}
+<h1>{% if mode == "create" %}Nova entrada do diário{% else %}Editar entrada{% endif %}</h1>
+
+<form method="post">
+  {% csrf_token %}
+
+  <p>
+    <label for="{{ form.kind.id_for_label }}">Tipo</label><br>
+    {{ form.kind }}
+  </p>
+
+  <p>
+    <label for="{{ form.title.id_for_label }}">Título (opcional)</label><br>
+    {{ form.title }}
+  </p>
+
+  <p>
+    <label for="{{ form.content.id_for_label }}">Conteúdo</label><br>
+    {{ form.content }}
+    {% if form.content.errors %}
+      <ul class="messages">{% for e in form.content.errors %}<li class="error">{{ e }}</li>{% endfor %}</ul>
+    {% endif %}
+  </p>
+
+  <p>
+    <label for="{{ form.mood.id_for_label }}">Humor associado (opcional)</label><br>
+    {{ form.mood }}
+  </p>
+
+  <p>
+    <label>
+      {{ form.is_shared_with_psychologist }}
+      Compartilhar com meu psicólogo
+    </label>
+  </p>
+
+  <button type="submit">{% if mode == "create" %}Salvar{% else %}Atualizar{% endif %}</button>
+  <a href="{% url 'journal:patient_journal_list' %}">Cancelar</a>
+</form>
+{% endblock %}

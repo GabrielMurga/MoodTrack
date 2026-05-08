@@ -36,7 +36,8 @@
       {% endif %}
       {% if user.is_patient %}
         <a href="{% url 'bonds:patient_dashboard' %}">Vínculo</a>
-        <a href="{% url 'journal:patient_list' %}">Diário</a>
+        <a href="{% url 'journal:patient_mood_list' %}">Humor</a>
+        <a href="{% url 'journal:patient_journal_list' %}">Diário</a>
       {% endif %}
       <span class="spacer"></span>
       <form method="post" action="{% url 'logout' %}" class="inline">
