@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Meu diário — MoodTrack{% endblock %}
+
+{% block content %}
+<h1>Meu diário</h1>
+
+<p style="margin-bottom: 1.5rem;">
+  <a href="{% url 'journal:patient_create' %}"><button>+ Novo registro</button></a>
+</p>
+
+{% if not entries %}
+  <p>Nenhum registro ainda. Comece com como você está se sentindo agora.</p>
+{% endif %}
+
+{% for entry in entries %}
+  <div class="card">
+    <div style="display: flex; align-items: center; gap: 0.6rem;">
+      <strong style="font-size: 1.1rem;">{{ entry.get_mood_display }}</strong>
+      {% if entry.is_shared_with_psychologist %}
+        <span class="status-badge status-active">Compartilhado</span>
+      {% else %}
+        <span class="status-badge">Privado</span>
+      {% endif %}
+      <span class="spacer" style="flex: 1;"></span>
+      <small style="color: #666;">{{ entry.created_at|date:"d/m/Y H:i" }}</small>
+    </div>
+
+    {% if entry.content %}
+      <p style="margin-top: 0.6rem; white-space: pre-wrap;">{{ entry.content }}</p>
+    {% endif %}
+
+    <div style="margin-top: 0.8rem; display: flex; gap: 0.5rem;">
+      <a href="{% url 'journal:patient_edit' entry.id %}"><button type="button">Editar</button></a>
+      <form method="post" action="{% url 'journal:patient_toggle_share' entry.id %}" class="inline">
+        {% csrf_token %}
+        {% if entry.is_shared_with_psychologist %}
+          <button type="submit">Tornar privado</button>
+        {% else %}
+          <button type="submit">Compartilhar com psicólogo</button>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+{% endfor %}
+{% endblock %}

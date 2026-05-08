@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Pacientes — MoodTrack{% endblock %}
+
+{% block content %}
+<h1>Meus pacientes</h1>
+
+{% if not bonds %}
+  <p>Você ainda não tem pacientes com vínculo ativo.</p>
+  <p><a href="{% url 'bonds:psychologist_dashboard' %}">Ir para vínculos</a></p>
+{% endif %}
+
+{% for bond in bonds %}
+  <div class="card">
+    <div style="display: flex; align-items: center; gap: 0.8rem;">
+      <strong>{{ bond.patient.user.get_full_name }}</strong>
+      <span style="color: #666;">{{ bond.patient.user.email }}</span>
+      <span class="spacer" style="flex: 1;"></span>
+      <a href="{% url 'journal:psychologist_patient_detail' bond.patient.id %}">
+        <button type="button">Ver registros</button>
+      </a>
+    </div>
+    <div style="margin-top: 0.4rem; color: #666; font-size: 0.85rem;">
+      Vínculo desde {{ bond.psychologist_confirmed_at|date:"d/m/Y" }}
+    </div>
+  </div>
+{% endfor %}
+{% endblock %}

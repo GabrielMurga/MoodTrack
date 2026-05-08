@@ -168,7 +168,11 @@ class Bond(models.Model):
         Se o paciente é o mesmo User do psicólogo do convite (caso dual:
         psicóloga que também faz terapia), recusa: ninguém pode ser próprio
         paciente.
+
+        Audit: registra em audit.AuditLog com actor = patient.user.
         """
+        from apps.audit.models import log_event
+
         if self.status != BondStatus.INVITED:
             raise InvalidBondTransition(
                 f"accept_invite só é válido em INVITED (status atual: {self.status})."
@@ -183,8 +187,20 @@ class Bond(models.Model):
         self.patient_entered_at = timezone.now()
         self.save(update_fields=["patient", "status", "patient_entered_at"])
 
+        log_event(
+            actor=patient.user,
+            action="bond.invite_accepted",
+            target=self,
+            invite_code=self.invite_code,
+        )
+
     def confirm(self) -> None:
-        """Psicólogo confirma o vínculo — PENDING_CONFIRMATION → ACTIVE."""
+        """Psicólogo confirma o vínculo — PENDING_CONFIRMATION → ACTIVE.
+
+        Audit: registra com actor = self.psychologist.user.
+        """
+        from apps.audit.models import log_event
+
         if self.status != BondStatus.PENDING_CONFIRMATION:
             raise InvalidBondTransition(
                 f"confirm só é válido em PENDING (status atual: {self.status})."
@@ -193,14 +209,32 @@ class Bond(models.Model):
         self.psychologist_confirmed_at = timezone.now()
         self.save(update_fields=["status", "psychologist_confirmed_at"])
 
+        log_event(
+            actor=self.psychologist.user,
+            action="bond.confirmed",
+            target=self,
+        )
+
     def end(self, by_user: User) -> None:
-        """Encerra o vínculo — qualquer estado vivo → ENDED."""
+        """Encerra o vínculo — qualquer estado vivo → ENDED.
+
+        Audit: registra com actor = by_user (quem encerrou).
+        """
+        from apps.audit.models import log_event
+
         if self.status == BondStatus.ENDED:
             raise InvalidBondTransition("Bond já está encerrado.")
         self.status = BondStatus.ENDED
         self.ended_at = timezone.now()
         self.ended_by = by_user
         self.save(update_fields=["status", "ended_at", "ended_by"])
+
+        log_event(
+            actor=by_user,
+            action="bond.ended",
+            target=self,
+            previous_status=str(BondStatus.ACTIVE) if self.psychologist_confirmed_at else "pre_active",
+        )
 
     # ----- helpers -----
 

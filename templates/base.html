@@ -31,10 +31,12 @@
     {% if user.is_authenticated %}
       <span><strong>{{ user.email }}</strong></span>
       {% if user.is_psychologist %}
-        <a href="{% url 'bonds:psychologist_dashboard' %}">Modo Psicólogo</a>
+        <a href="{% url 'bonds:psychologist_dashboard' %}">Vínculos</a>
+        <a href="{% url 'journal:psychologist_patients' %}">Pacientes</a>
       {% endif %}
       {% if user.is_patient %}
-        <a href="{% url 'bonds:patient_dashboard' %}">Modo Paciente</a>
+        <a href="{% url 'bonds:patient_dashboard' %}">Vínculo</a>
+        <a href="{% url 'journal:patient_list' %}">Diário</a>
       {% endif %}
       <span class="spacer"></span>
       <form method="post" action="{% url 'logout' %}" class="inline">

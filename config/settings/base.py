@@ -22,6 +22,11 @@ SECRET_KEY = env("SECRET_KEY")
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[])
 
+# Chave de criptografia de campos (django-cryptography-5).
+# Gerar com: Fernet.generate_key().decode()
+# Em produção, vem de secret manager separado do backup do banco (ADR 0006).
+CRYPTOGRAPHY_KEY = env("FIELD_ENCRYPTION_KEY").encode()
+
 
 # Applications
 DJANGO_APPS = [
@@ -45,7 +50,9 @@ THIRD_PARTY_APPS = [
 LOCAL_APPS = [
     "apps.core",
     "apps.accounts",
+    "apps.audit",
     "apps.bonds",
+    "apps.journal",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

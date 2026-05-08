@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ patient.user.email }} — MoodTrack{% endblock %}
+
+{% block content %}
+<p><a href="{% url 'journal:psychologist_patients' %}">← Voltar para pacientes</a></p>
+
+<h1>{{ patient.user.get_full_name }}</h1>
+<p style="color: #666;">{{ patient.user.email }} · vínculo desde {{ bond.psychologist_confirmed_at|date:"d/m/Y" }}</p>
+
+<h2 style="margin-top: 2rem;">Registros compartilhados</h2>
+
+{% if not entries %}
+  <p style="color: #666;">
+    O paciente ainda não compartilhou nenhum registro. Apenas registros que ele
+    explicitamente marcou como compartilhados aparecem aqui.
+  </p>
+{% endif %}
+
+{% for entry in entries %}
+  <div class="card">
+    <div style="display: flex; align-items: center; gap: 0.6rem;">
+      <strong style="font-size: 1.05rem;">{{ entry.get_mood_display }}</strong>
+      <span class="spacer" style="flex: 1;"></span>
+      <small style="color: #666;">{{ entry.created_at|date:"d/m/Y H:i" }}</small>
+    </div>
+    {% if entry.content %}
+      <p style="margin-top: 0.6rem; white-space: pre-wrap;">{{ entry.content }}</p>
+    {% endif %}
+  </div>
+{% endfor %}
+{% endblock %}

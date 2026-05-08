@@ -12,5 +12,6 @@ urlpatterns = [
         name="login",
     ),
     path("logout/", LogoutView.as_view(next_page="login"), name="logout"),
+    path("", include("apps.journal.urls", namespace="journal")),
     path("", include("apps.bonds.urls", namespace="bonds")),
 ]
