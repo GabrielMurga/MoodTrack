@@ -45,6 +45,7 @@ THIRD_PARTY_APPS = [
 LOCAL_APPS = [
     "apps.core",
     "apps.accounts",
+    "apps.bonds",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -124,6 +125,12 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+# Login redirects (Django built-in auth)
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "bonds:home"
+LOGOUT_REDIRECT_URL = "login"
 
 
 # DRF — defaults conservadores; ajustar quando endpoints surgirem.

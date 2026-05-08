@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Entrar — MoodTrack{% endblock %}
+
+{% block content %}
+<h1>Entrar</h1>
+
+{% if form.non_field_errors %}
+  <ul class="messages">
+    {% for err in form.non_field_errors %}<li class="error">{{ err }}</li>{% endfor %}
+  </ul>
+{% endif %}
+
+<form method="post">
+  {% csrf_token %}
+  <p>
+    <label for="id_username">Email</label><br>
+    <input type="email" name="username" id="id_username" autofocus required>
+  </p>
+  <p>
+    <label for="id_password">Senha</label><br>
+    <input type="password" name="password" id="id_password" required>
+  </p>
+  <input type="hidden" name="next" value="{{ next }}">
+  <button type="submit">Entrar</button>
+</form>
+
+<p style="margin-top: 2rem; color: #666; font-size: 0.9rem;">
+  No MVP, login com senha existe apenas em desenvolvimento. Em produção, autenticação será via Google OAuth.
+</p>
+{% endblock %}

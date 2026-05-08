@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Painel do psicólogo — MoodTrack{% endblock %}
+
+{% block content %}
+<h1>Vínculos</h1>
+
+<form method="post" action="{% url 'bonds:create_invite' %}" style="margin-bottom: 1.5rem;">
+  {% csrf_token %}
+  <button type="submit">+ Gerar novo convite</button>
+</form>
+
+{% if not bonds %}
+  <p>Nenhum vínculo ainda. Gere um convite para começar.</p>
+{% endif %}
+
+{% for bond in bonds %}
+  <div class="card">
+    <div style="display: flex; align-items: center; gap: 0.6rem;">
+      <code class="invite">{{ bond.invite_code }}</code>
+      <span class="status-badge status-{{ bond.status }}">{{ bond.get_status_display }}</span>
+    </div>
+
+    <div style="margin-top: 0.6rem; color: #444;">
+      {% if bond.patient %}
+        <strong>Paciente:</strong> {{ bond.patient.user.email }}
+      {% else %}
+        <em>Aguardando paciente inserir o código.</em>
+      {% endif %}
+    </div>
+
+    <div style="margin-top: 0.6rem; font-size: 0.85rem; color: #666;">
+      Convite criado em {{ bond.invited_at|date:"d/m/Y H:i" }}
+      {% if bond.psychologist_confirmed_at %}
+        · Confirmado em {{ bond.psychologist_confirmed_at|date:"d/m/Y H:i" }}
+      {% endif %}
+      {% if bond.ended_at %}
+        · Encerrado em {{ bond.ended_at|date:"d/m/Y H:i" }}
+      {% endif %}
+    </div>
+
+    <div style="margin-top: 0.8rem;">
+      {% if bond.status == BondStatus.PENDING_CONFIRMATION.value %}
+        <form method="post" action="{% url 'bonds:confirm_bond' bond.id %}" class="inline">
+          {% csrf_token %}
+          <button type="submit">Confirmar vínculo</button>
+        </form>
+      {% endif %}
+      {% if bond.is_alive %}
+        <form method="post" action="{% url 'bonds:end_bond' bond.id %}" class="inline">
+          {% csrf_token %}
+          <button type="submit">Encerrar</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+{% endfor %}
+{% endblock %}

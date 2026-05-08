@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Meu vínculo — MoodTrack{% endblock %}
+
+{% block content %}
+<h1>Vínculo terapêutico</h1>
+
+{% if bond %}
+  <div class="card">
+    <div style="display: flex; align-items: center; gap: 0.6rem;">
+      <span class="status-badge status-{{ bond.status }}">{{ bond.get_status_display }}</span>
+    </div>
+    <div style="margin-top: 0.6rem;">
+      <strong>Psicólogo:</strong> {{ bond.psychologist.user.email }}
+    </div>
+    {% if bond.status == BondStatus.PENDING_CONFIRMATION.value %}
+      <p style="margin-top: 0.6rem; color: #666;">
+        Você inseriu o código. Aguardando o psicólogo confirmar o vínculo.
+      </p>
+    {% endif %}
+    {% if bond.status == BondStatus.ACTIVE.value %}
+      <p style="margin-top: 0.6rem; color: #2d6a3d;">
+        Vínculo ativo desde {{ bond.psychologist_confirmed_at|date:"d/m/Y" }}.
+      </p>
+    {% endif %}
+
+    <div style="margin-top: 0.8rem;">
+      <form method="post" action="{% url 'bonds:end_bond' bond.id %}" class="inline">
+        {% csrf_token %}
+        <button type="submit">Encerrar vínculo</button>
+      </form>
+    </div>
+  </div>
+{% else %}
+  <p>Você ainda não tem um vínculo ativo. Insira abaixo o código que seu psicólogo te enviou.</p>
+
+  <form method="post" action="{% url 'bonds:enter_invite' %}">
+    {% csrf_token %}
+    <p>
+      <label for="id_invite_code">Código de convite</label><br>
+      {{ form.invite_code }}
+      {% if form.invite_code.help_text %}
+        <small style="display: block; color: #666;">{{ form.invite_code.help_text }}</small>
+      {% endif %}
+      {% if form.invite_code.errors %}
+        <ul class="messages">
+          {% for err in form.invite_code.errors %}<li class="error">{{ err }}</li>{% endfor %}
+        </ul>
+      {% endif %}
+    </p>
+    <button type="submit">Enviar código</button>
+  </form>
+{% endif %}
+{% endblock %}

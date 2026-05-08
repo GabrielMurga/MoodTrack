@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import User
+from .models import PatientProfile, PsychologistProfile, User
 
 
 @admin.register(User)
@@ -10,3 +10,19 @@ class UserAdmin(admin.ModelAdmin):
     search_fields = ("email", "full_name")
     ordering = ("-date_joined",)
     readonly_fields = ("date_joined", "last_login")
+
+
+@admin.register(PsychologistProfile)
+class PsychologistProfileAdmin(admin.ModelAdmin):
+    list_display = ("user", "crp_number", "created_at")
+    search_fields = ("user__email", "crp_number")
+    autocomplete_fields = ("user",)
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(PatientProfile)
+class PatientProfileAdmin(admin.ModelAdmin):
+    list_display = ("user", "preferred_name", "birth_date", "created_at")
+    search_fields = ("user__email", "preferred_name")
+    autocomplete_fields = ("user",)
+    readonly_fields = ("created_at", "updated_at")
