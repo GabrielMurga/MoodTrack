@@ -24,22 +24,25 @@ Plataforma de acompanhamento contínuo da saúde mental que conecta psicólogos 
 
 ## Quickstart (desenvolvimento)
 
-Pré-requisitos: [uv](https://docs.astral.sh/uv/), Docker Desktop, Python 3.11.
+Pré-requisitos: [uv](https://docs.astral.sh/uv/), Python 3.11, PostgreSQL 16 rodando localmente.
 
 ```bash
 # 1. Instalar dependências (cria .venv automaticamente)
 uv sync
 
-# 2. Subir Postgres + Redis
-docker compose up -d
+# 2. Criar usuário e database no Postgres (uma única vez)
+psql -U postgres -c "CREATE USER moodtrack WITH PASSWORD 'moodtrack';" \
+                  -c "CREATE DATABASE moodtrack OWNER moodtrack;"
 
 # 3. Configurar variáveis de ambiente
-cp .env.example .env  # edite SECRET_KEY se quiser
+cp .env.example .env  # ajuste SECRET_KEY e DATABASE_URL se necessário
 
 # 4. Aplicar migrations e iniciar o servidor
 uv run python manage.py migrate
 uv run python manage.py runserver
 ```
+
+> Redis (para Celery) entra quando o pipeline de IA for implementado.
 
 Comandos úteis:
 

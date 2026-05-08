@@ -55,8 +55,8 @@ staging, prod).
   + Redis siga como fila principal.
 
 **Negativas:**
-- Operação local exige Postgres rodando (Docker Compose resolve, mas adiciona
-  fricção comparado a SQLite).
+- Operação local exige Postgres rodando, vs SQLite que seria só um arquivo.
+  Trade-off aceito pelo paralelismo dev/prod.
 - Backups, vacuum tuning e replicação demandam mais cuidado operacional que
   alternativas mais simples — mas isso vem com qualquer banco que aguente o
   volume real do produto.
