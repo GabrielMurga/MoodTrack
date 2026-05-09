@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Insights — MoodTrack{% endblock %}
+
+{% block content %}
+<h1>Insights da semana</h1>
+<p style="color: #666;">
+  Devolutiva gerada a partir dos seus registros de humor e diário dos últimos 7 dias.
+  Material de reflexão — não é diagnóstico nem conselho clínico.
+</p>
+
+<form method="post" action="{% url 'ai:patient_generate_weekly' %}" style="margin: 1.5rem 0;">
+  {% csrf_token %}
+  <button type="submit">Gerar resumo da semana</button>
+</form>
+
+{% if not summaries %}
+  <p>Nenhum resumo ainda. Quanto mais registros você tiver, mais útil fica.</p>
+{% endif %}
+
+{% for s in summaries %}
+  <div class="card">
+    <div style="display: flex; align-items: center; gap: 0.8rem;">
+      <strong>Semana de {{ s.period_start|date:"d/m" }} a {{ s.period_end|date:"d/m" }}</strong>
+      <span class="spacer" style="flex: 1;"></span>
+      <small style="color: #666;">gerado {{ s.generated_at|date:"d/m/Y H:i" }} · {{ s.model_used }}</small>
+    </div>
+    <p style="margin-top: 0.8rem; white-space: pre-wrap;">{{ s.content }}</p>
+  </div>
+{% endfor %}
+{% endblock %}

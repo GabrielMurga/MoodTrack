@@ -28,6 +28,14 @@ ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[])
 CRYPTOGRAPHY_KEY = env("FIELD_ENCRYPTION_KEY").encode()
 
 
+# IA (Anthropic) — ver ADR 0008.
+# ANTHROPIC_API_KEY ausente → views de IA mostram erro amigável.
+# ANTHROPIC_ZDR_CONFIRMED=false → cliente recusa chamadas (cinto de segurança).
+ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
+ANTHROPIC_ZDR_CONFIRMED = env.bool("ANTHROPIC_ZDR_CONFIRMED", default=False)
+ANTHROPIC_DEFAULT_MODEL = env("ANTHROPIC_DEFAULT_MODEL", default="claude-sonnet-4-6")
+
+
 # Applications
 DJANGO_APPS = [
     "django.contrib.admin",
@@ -53,6 +61,7 @@ LOCAL_APPS = [
     "apps.audit",
     "apps.bonds",
     "apps.journal",
+    "apps.ai",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

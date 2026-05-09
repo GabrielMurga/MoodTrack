@@ -7,6 +7,10 @@
 <h1>{{ patient.user.get_full_name }}</h1>
 <p style="color: #666;">{{ patient.user.email }} · vínculo desde {{ bond.psychologist_confirmed_at|date:"d/m/Y" }}</p>
 
+<p style="margin-top: 1rem;">
+  <a href="{% url 'ai:psychologist_briefing_detail' patient.id %}"><button type="button">Ver / gerar briefing</button></a>
+</p>
+
 <h2 style="margin-top: 2rem;">Anotações clínicas</h2>
 <p>
   <a href="{% url 'journal:clinical_note_create' patient.id %}"><button>+ Nova anotação</button></a>

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Briefings — {{ bond.patient.user.email }}{% endblock %}
+
+{% block content %}
+<p><a href="{% url 'journal:psychologist_patient_detail' bond.patient.id %}">← Voltar para paciente</a></p>
+
+<h1>Briefings — {{ bond.patient.user.get_full_name }}</h1>
+
+<form method="post" action="{% url 'ai:psychologist_generate_briefing' bond.patient.id %}" style="margin: 1.5rem 0;">
+  {% csrf_token %}
+  <button type="submit">Gerar briefing pré-sessão</button>
+</form>
+
+{% if not briefings %}
+  <p>Nenhum briefing gerado ainda.</p>
+{% endif %}
+
+{% for b in briefings %}
+  <div class="card">
+    <div style="display: flex; align-items: center; gap: 0.8rem;">
+      <strong>Janela: {{ b.period_start|date:"d/m H:i" }} → {{ b.period_end|date:"d/m H:i" }}</strong>
+      <span class="spacer" style="flex: 1;"></span>
+      <small style="color: #666;">gerado {{ b.generated_at|date:"d/m/Y H:i" }} · {{ b.model_used }}</small>
+    </div>
+    <pre style="margin-top: 0.8rem; white-space: pre-wrap; font-family: inherit;">{{ b.content }}</pre>
+  </div>
+{% endfor %}
+{% endblock %}

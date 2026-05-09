@@ -15,6 +15,8 @@ dependencies = [
     "django-allauth[socialaccount]>=65,<66",
     "django-environ>=0.11,<0.12",
     "django-cryptography-5>=2.0,<3",
+    "anthropic>=0.40,<1",
+    "spacy>=3.8,<4",
 ]
 
 [dependency-groups]
@@ -33,6 +35,9 @@ DJANGO_SETTINGS_MODULE = "config.settings.development"
 python_files = ["test_*.py", "*_test.py"]
 testpaths = ["tests"]
 addopts = ["--tb=short", "-ra"]
+markers = [
+    "slow: testes lentos (carregam modelo spaCy ou similar)",
+]
 
 [tool.ruff]
 target-version = "py311"
