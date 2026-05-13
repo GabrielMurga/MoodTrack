@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import PatientProfile, PsychologistProfile, User
+from .models import HealthcareProvider, PatientProfile, User
 
 
 @admin.register(User)
@@ -12,10 +12,11 @@ class UserAdmin(admin.ModelAdmin):
     readonly_fields = ("date_joined", "last_login")
 
 
-@admin.register(PsychologistProfile)
-class PsychologistProfileAdmin(admin.ModelAdmin):
-    list_display = ("user", "crp_number", "created_at")
-    search_fields = ("user__email", "crp_number")
+@admin.register(HealthcareProvider)
+class HealthcareProviderAdmin(admin.ModelAdmin):
+    list_display = ("user", "kind", "plan", "crp_number", "crm_number", "created_at")
+    list_filter = ("kind", "plan")
+    search_fields = ("user__email", "crp_number", "crm_number")
     autocomplete_fields = ("user",)
     readonly_fields = ("created_at", "updated_at")
 

@@ -10,16 +10,16 @@
       <span class="status-badge status-{{ bond.status }}">{{ bond.get_status_display }}</span>
     </div>
     <div style="margin-top: 0.6rem;">
-      <strong>Psicólogo:</strong> {{ bond.psychologist.user.email }}
+      <strong>{{ bond.provider.get_kind_display }}:</strong> {{ bond.provider.user.email }}
     </div>
     {% if bond.status == BondStatus.PENDING_CONFIRMATION.value %}
       <p style="margin-top: 0.6rem; color: #666;">
-        Você inseriu o código. Aguardando o psicólogo confirmar o vínculo.
+        Você inseriu o código. Aguardando o profissional confirmar o vínculo.
       </p>
     {% endif %}
     {% if bond.status == BondStatus.ACTIVE.value %}
       <p style="margin-top: 0.6rem; color: #2d6a3d;">
-        Vínculo ativo desde {{ bond.psychologist_confirmed_at|date:"d/m/Y" }}.
+        Vínculo ativo desde {{ bond.provider_confirmed_at|date:"d/m/Y" }}.
       </p>
     {% endif %}
 
@@ -31,7 +31,7 @@
     </div>
   </div>
 {% else %}
-  <p>Você ainda não tem um vínculo ativo. Insira abaixo o código que seu psicólogo te enviou.</p>
+  <p>Você ainda não tem um vínculo ativo. Insira abaixo o código que seu profissional te enviou.</p>
 
   <form method="post" action="{% url 'bonds:enter_invite' %}">
     {% csrf_token %}
@@ -49,5 +49,40 @@
     </p>
     <button type="submit">Enviar código</button>
   </form>
+{% endif %}
+
+{# ---- Medicações prescritas (pelo psiquiatra) ---- #}
+<h2 style="margin-top: 2.5rem;">Medicações prescritas</h2>
+{% if medications %}
+  {% for med in medications %}
+    <div class="card">
+      <strong>{{ med.name }}</strong>
+      {% if med.dosage %}<span style="color: #555;"> · {{ med.dosage }}</span>{% endif %}
+      {% if med.frequency %}<span style="color: #555;"> · {{ med.frequency }}</span>{% endif %}
+      {% if med.notes %}
+        <p style="margin-top: 0.4rem; color: #666; font-size: 0.9rem;">{{ med.notes }}</p>
+      {% endif %}
+      <small style="display: block; margin-top: 0.4rem; color: #888;">
+        Prescrito por {{ med.prescribed_by.get_kind_display }} {{ med.prescribed_by.user.get_full_name }}
+        {% if med.started_at %}· desde {{ med.started_at|date:"d/m/Y" }}{% endif %}
+      </small>
+    </div>
+  {% endfor %}
+{% else %}
+  <p style="color: #666;">Nenhuma medicação prescrita no momento.</p>
+{% endif %}
+
+{# ---- Medicações auto-relatadas pelo paciente ---- #}
+<h2 style="margin-top: 2rem;">O que estou tomando</h2>
+<p>
+  <a href="{% url 'clinical:patient_reported_medication' %}"><button type="button">Atualizar lista</button></a>
+</p>
+{% if reported_medication %}
+  <div class="card">
+    <small style="color: #666;">Última atualização: {{ reported_medication.updated_at|date:"d/m/Y H:i" }}</small>
+    <p style="margin-top: 0.4rem; white-space: pre-wrap;">{{ reported_medication.content }}</p>
+  </div>
+{% else %}
+  <p style="color: #666;">Você ainda não registrou suas medicações.</p>
 {% endif %}
 {% endblock %}

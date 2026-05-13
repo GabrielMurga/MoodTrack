@@ -14,6 +14,8 @@ Observações importantes de visibilidade:
 
 from __future__ import annotations
 
+from datetime import date
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import Http404, HttpRequest, HttpResponse
@@ -22,11 +24,13 @@ from django.views.decorators.http import require_POST
 
 from apps.audit.models import log_event
 from apps.bonds.models import Bond, BondStatus
+from apps.clinical.models import Medication, PatientReportedMedication
 
 from .forms import ClinicalNoteForm, JournalEntryForm, MoodLogForm
 from .models import ClinicalNote, JournalEntry, MoodLog
 
 # ---------- helpers ----------
+
 
 def _require_patient(request: HttpRequest):
     if not request.user.is_patient:
@@ -34,17 +38,17 @@ def _require_patient(request: HttpRequest):
     return request.user.patient_profile
 
 
-def _require_psychologist(request: HttpRequest):
-    if not request.user.is_psychologist:
-        raise Http404("Perfil de psicólogo não encontrado.")
-    return request.user.psychologist_profile
+def _require_provider(request: HttpRequest):
+    if not request.user.is_provider:
+        raise Http404("Perfil de profissional não encontrado.")
+    return request.user.provider_profile
 
 
-def _bond_or_404_for_psych(psych, patient_id: int) -> Bond:
-    """Retorna Bond ATIVO entre psicólogo logado e patient_id, ou 404."""
+def _bond_or_404_for_provider(provider, patient_id: int) -> Bond:
+    """Retorna Bond ATIVO entre profissional logado e patient_id, ou 404."""
     bond = (
         Bond.objects.filter(
-            psychologist=psych,
+            provider=provider,
             patient_id=patient_id,
             status=BondStatus.ACTIVE,
         )
@@ -81,7 +85,7 @@ def patient_mood_create(request: HttpRequest) -> HttpResponse:
                 actor=request.user,
                 action="mood_log.created",
                 target=log,
-                shared=log.is_shared_with_psychologist,
+                shared=log.is_shared_with_provider,
                 mood=log.mood,
             )
             messages.success(request, "Humor registrado.")
@@ -96,13 +100,13 @@ def patient_mood_create(request: HttpRequest) -> HttpResponse:
 def patient_mood_toggle_share(request: HttpRequest, log_id: int) -> HttpResponse:
     profile = _require_patient(request)
     log = get_object_or_404(MoodLog.objects.for_patient(profile), pk=log_id)
-    log.is_shared_with_psychologist = not log.is_shared_with_psychologist
-    log.save(update_fields=["is_shared_with_psychologist"])
+    log.is_shared_with_provider = not log.is_shared_with_provider
+    log.save(update_fields=["is_shared_with_provider"])
     log_event(
         actor=request.user,
         action="mood_log.share_toggled",
         target=log,
-        shared=log.is_shared_with_psychologist,
+        shared=log.is_shared_with_provider,
     )
     return redirect("journal:patient_mood_list")
 
@@ -133,7 +137,7 @@ def patient_journal_create(request: HttpRequest) -> HttpResponse:
                 action="journal_entry.created",
                 target=entry,
                 kind=entry.kind,
-                shared=entry.is_shared_with_psychologist,
+                shared=entry.is_shared_with_provider,
             )
             messages.success(request, "Registro salvo.")
             return redirect("journal:patient_journal_list")
@@ -172,13 +176,13 @@ def patient_journal_edit(request: HttpRequest, entry_id: int) -> HttpResponse:
 def patient_journal_toggle_share(request: HttpRequest, entry_id: int) -> HttpResponse:
     profile = _require_patient(request)
     entry = get_object_or_404(JournalEntry.objects.for_patient(profile), pk=entry_id)
-    entry.is_shared_with_psychologist = not entry.is_shared_with_psychologist
-    entry.save(update_fields=["is_shared_with_psychologist", "updated_at"])
+    entry.is_shared_with_provider = not entry.is_shared_with_provider
+    entry.save(update_fields=["is_shared_with_provider", "updated_at"])
     log_event(
         actor=request.user,
         action="journal_entry.share_toggled",
         target=entry,
-        shared=entry.is_shared_with_psychologist,
+        shared=entry.is_shared_with_provider,
     )
     return redirect("journal:patient_journal_list")
 
@@ -189,45 +193,49 @@ def patient_journal_toggle_share(request: HttpRequest, entry_id: int) -> HttpRes
 
 
 @login_required
-def psychologist_patient_list(request: HttpRequest) -> HttpResponse:
-    profile = _require_psychologist(request)
-    active_bonds = (
-        Bond.objects.filter(psychologist=profile, status=BondStatus.ACTIVE)
-        .select_related("patient__user")
+def provider_patient_list(request: HttpRequest) -> HttpResponse:
+    profile = _require_provider(request)
+    active_bonds = Bond.objects.filter(provider=profile, status=BondStatus.ACTIVE).select_related(
+        "patient__user"
     )
     return render(
         request,
-        "journal/psychologist_patient_list.html",
+        "journal/provider_patient_list.html",
         {"bonds": active_bonds},
     )
 
 
 @login_required
-def psychologist_patient_detail(request: HttpRequest, patient_id: int) -> HttpResponse:
-    """Timeline do paciente para o psicólogo.
+def provider_patient_detail(request: HttpRequest, patient_id: int) -> HttpResponse:
+    """Timeline do paciente para o profissional.
 
     Mostra:
     - MoodLogs shared (filtro duplo: bond ativo + flag)
     - JournalEntries shared (filtro duplo)
-    - ClinicalNotes próprias do psicólogo (visibilidade unilateral)
+    - ClinicalNotes próprias do profissional (visibilidade unilateral)
 
     Acesso via URL direta a paciente não-bonded → 404.
     """
-    profile = _require_psychologist(request)
-    bond = _bond_or_404_for_psych(profile, patient_id)
+    profile = _require_provider(request)
+    bond = _bond_or_404_for_provider(profile, patient_id)
 
-    mood_logs = MoodLog.objects.shared_with_psychologist(profile).filter(
-        patient_id=patient_id
-    )
-    journal_entries = JournalEntry.objects.shared_with_psychologist(profile).filter(
+    patient = bond.patient
+    mood_logs = MoodLog.objects.shared_with_provider(profile).filter(patient_id=patient_id)
+    journal_entries = JournalEntry.objects.shared_with_provider(profile).filter(
         patient_id=patient_id
     )
     clinical_notes = ClinicalNote.objects.for_bond(bond)
+    medications = Medication.objects.visible_to_provider(profile).filter(
+        patient_id=patient_id
+    ).select_related("prescribed_by__user")
+    reported_medications = PatientReportedMedication.objects.for_patient(patient).order_by(
+        "-updated_at"
+    )[:1]
 
     log_event(
         actor=request.user,
         action="patient_timeline.viewed",
-        target=bond.patient,
+        target=patient,
         mood_log_count=mood_logs.count(),
         journal_entry_count=journal_entries.count(),
         clinical_note_count=clinical_notes.count(),
@@ -235,13 +243,85 @@ def psychologist_patient_detail(request: HttpRequest, patient_id: int) -> HttpRe
 
     return render(
         request,
-        "journal/psychologist_patient_detail.html",
+        "journal/provider_patient_detail.html",
         {
             "bond": bond,
-            "patient": bond.patient,
+            "patient": patient,
             "mood_logs": mood_logs,
             "journal_entries": journal_entries,
             "clinical_notes": clinical_notes,
+            "medications": medications,
+            "reported_medication": reported_medications.first(),
+        },
+    )
+
+
+# ===========================================================================
+# Profissional — tela de consulta (durante o atendimento)
+# ===========================================================================
+
+
+@login_required
+def provider_session(request: HttpRequest, patient_id: int) -> HttpResponse:
+    """Tela de trabalho do profissional durante uma consulta.
+
+    Foco: contexto rápido (últimas anotações + medicações ativas + auto-reporte
+    do paciente) + área de escrita para a nota da sessão de hoje. Aberta tanto
+    para psicólogo quanto para psiquiatra (regra 6: já filtrado por bond ativo).
+    """
+    profile = _require_provider(request)
+    bond = _bond_or_404_for_provider(profile, patient_id)
+    patient = bond.patient
+
+    if request.method == "POST":
+        form = ClinicalNoteForm(request.POST)
+        if form.is_valid():
+            note = form.save(commit=False)
+            note.bond = bond
+            note.save()
+            log_event(
+                actor=request.user,
+                action="clinical_note.created",
+                target=note,
+                bond_id=bond.id,
+                from_session_view=True,
+            )
+            messages.success(request, "Anotação da sessão salva.")
+            return redirect("journal:provider_session", patient_id=patient_id)
+    else:
+        form = ClinicalNoteForm(initial={"session_date": date.today()})
+
+    # Últimas 3 anotações — contexto da(s) sessão(ões) anterior(es).
+    recent_notes = ClinicalNote.objects.for_bond(bond).order_by("-created_at")[:3]
+
+    # Medicações ativas (visíveis para psicólogo e psiquiatra).
+    medications = (
+        Medication.objects.visible_to_provider(profile)
+        .filter(patient_id=patient_id)
+        .active()
+        .select_related("prescribed_by__user")
+    )
+    reported_medication = (
+        PatientReportedMedication.objects.for_patient(patient).order_by("-updated_at").first()
+    )
+
+    log_event(
+        actor=request.user,
+        action="provider_session.opened",
+        target=patient,
+        bond_id=bond.id,
+    )
+
+    return render(
+        request,
+        "journal/provider_session.html",
+        {
+            "bond": bond,
+            "patient": patient,
+            "form": form,
+            "recent_notes": recent_notes,
+            "medications": medications,
+            "reported_medication": reported_medication,
         },
     )
 
@@ -253,8 +333,8 @@ def psychologist_patient_detail(request: HttpRequest, patient_id: int) -> HttpRe
 
 @login_required
 def clinical_note_create(request: HttpRequest, patient_id: int) -> HttpResponse:
-    profile = _require_psychologist(request)
-    bond = _bond_or_404_for_psych(profile, patient_id)
+    profile = _require_provider(request)
+    bond = _bond_or_404_for_provider(profile, patient_id)
 
     if request.method == "POST":
         form = ClinicalNoteForm(request.POST)
@@ -269,7 +349,7 @@ def clinical_note_create(request: HttpRequest, patient_id: int) -> HttpResponse:
                 bond_id=bond.id,
             )
             messages.success(request, "Anotação salva.")
-            return redirect("journal:psychologist_patient_detail", patient_id=patient_id)
+            return redirect("journal:provider_patient_detail", patient_id=patient_id)
     else:
         form = ClinicalNoteForm()
 
@@ -282,9 +362,9 @@ def clinical_note_create(request: HttpRequest, patient_id: int) -> HttpResponse:
 
 @login_required
 def clinical_note_edit(request: HttpRequest, note_id: int) -> HttpResponse:
-    profile = _require_psychologist(request)
+    profile = _require_provider(request)
     note = get_object_or_404(
-        ClinicalNote.objects.for_psychologist(profile),
+        ClinicalNote.objects.for_provider(profile),
         pk=note_id,
     )
     if request.method == "POST":
@@ -298,9 +378,7 @@ def clinical_note_edit(request: HttpRequest, note_id: int) -> HttpResponse:
                 fields=list(form.changed_data),
             )
             messages.success(request, "Anotação atualizada.")
-            return redirect(
-                "journal:psychologist_patient_detail", patient_id=note.bond.patient_id
-            )
+            return redirect("journal:provider_patient_detail", patient_id=note.bond.patient_id)
     else:
         form = ClinicalNoteForm(instance=note)
 

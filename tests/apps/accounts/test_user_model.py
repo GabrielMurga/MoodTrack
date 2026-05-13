@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import pytest
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 
-from apps.accounts.models import PatientProfile, PsychologistProfile, User
+from apps.accounts.models import HealthcareProvider, PatientProfile, ProviderKind, User
 from tests.factories import (
+    HealthcareProviderFactory,
     PatientProfileFactory,
-    PsychologistProfileFactory,
+    PsychiatristProviderFactory,
     UserFactory,
 )
 
@@ -39,33 +41,85 @@ class TestUserManager:
 class TestUserProfileFlags:
     def test_user_without_profiles(self):
         user = UserFactory()
+        assert user.is_provider is False
         assert user.is_psychologist is False
+        assert user.is_psychiatrist is False
         assert user.is_patient is False
 
-    def test_user_with_psychologist_profile(self):
+    def test_user_with_provider_profile_psychologist(self):
         user = UserFactory()
-        PsychologistProfileFactory(user=user)
+        HealthcareProviderFactory(user=user)
         user.refresh_from_db()
+        assert user.is_provider is True
         assert user.is_psychologist is True
+        assert user.is_psychiatrist is False
         assert user.is_patient is False
+
+    def test_user_with_psychiatrist_profile(self):
+        user = UserFactory()
+        PsychiatristProviderFactory(user=user)
+        user.refresh_from_db()
+        assert user.is_provider is True
+        assert user.is_psychologist is False
+        assert user.is_psychiatrist is True
 
     def test_user_with_both_profiles(self):
-        """Caso central: psicóloga que também faz terapia."""
+        """Caso central: profissional que também faz terapia."""
         user = UserFactory()
-        PsychologistProfileFactory(user=user)
+        HealthcareProviderFactory(user=user)
         PatientProfileFactory(user=user)
         user.refresh_from_db()
-        assert user.is_psychologist is True
+        assert user.is_provider is True
         assert user.is_patient is True
 
 
 class TestProfileUniqueness:
-    def test_one_psychologist_profile_per_user(self):
-        psych = PsychologistProfileFactory()
+    def test_one_provider_profile_per_user(self):
+        provider = HealthcareProviderFactory()
         with pytest.raises(IntegrityError):
-            PsychologistProfile.objects.create(user=psych.user, crp_number="X")
+            HealthcareProvider.objects.create(
+                user=provider.user,
+                kind=ProviderKind.PSYCHOLOGIST,
+                crp_number="X",
+            )
 
     def test_one_patient_profile_per_user(self):
         patient = PatientProfileFactory()
         with pytest.raises(IntegrityError):
             PatientProfile.objects.create(user=patient.user)
+
+
+class TestProviderKindValidation:
+    def test_psychologist_cannot_have_crm(self):
+        provider = HealthcareProviderFactory.build(
+            kind=ProviderKind.PSYCHOLOGIST,
+            crp_number="06/12345",
+            crm_number="SP/9999",
+        )
+        with pytest.raises(ValidationError):
+            provider.full_clean()
+
+    def test_psychiatrist_cannot_have_crp(self):
+        provider = HealthcareProviderFactory.build(
+            kind=ProviderKind.PSYCHIATRIST,
+            crp_number="06/12345",
+            crm_number="SP/9999",
+        )
+        with pytest.raises(ValidationError):
+            provider.full_clean()
+
+    def test_check_constraint_blocks_psychologist_with_crm_at_db_level(self):
+        user = UserFactory()
+        with pytest.raises(IntegrityError):
+            HealthcareProvider.objects.create(
+                user=user,
+                kind=ProviderKind.PSYCHOLOGIST,
+                crp_number="06/12345",
+                crm_number="SP/9999",
+            )
+
+    def test_can_prescribe_only_for_psychiatrist(self):
+        psychologist = HealthcareProviderFactory()
+        psychiatrist = PsychiatristProviderFactory()
+        assert psychologist.can_prescribe is False
+        assert psychiatrist.can_prescribe is True

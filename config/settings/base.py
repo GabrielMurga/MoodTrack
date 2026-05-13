@@ -5,6 +5,7 @@ Values that vary per environment or carry secrets MUST come from env vars
 via django-environ — never commit them.
 """
 
+from decimal import Decimal
 from pathlib import Path
 
 import environ
@@ -35,6 +36,15 @@ ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
 ANTHROPIC_ZDR_CONFIRMED = env.bool("ANTHROPIC_ZDR_CONFIRMED", default=False)
 ANTHROPIC_DEFAULT_MODEL = env("ANTHROPIC_DEFAULT_MODEL", default="claude-sonnet-4-6")
 
+# Modelos por plano: Pro usa Haiku (mais barato), Premium usa Sonnet (melhor qualidade).
+ANTHROPIC_PRO_MODEL = env("ANTHROPIC_PRO_MODEL", default="claude-haiku-4-5-20251001")
+ANTHROPIC_PREMIUM_MODEL = env("ANTHROPIC_PREMIUM_MODEL", default="claude-sonnet-4-6")
+
+# Custo por plano (ADR 0011). Taxa USD→BRL configurável via env pra absorver variação cambial.
+AI_USD_TO_BRL_RATE = env.float("AI_USD_TO_BRL_RATE", default=5.70)
+AI_PRO_MONTHLY_LIMIT_BRL = Decimal("50.00")
+AI_PREMIUM_MONTHLY_LIMIT_BRL = Decimal("200.00")
+
 
 # Applications
 DJANGO_APPS = [
@@ -62,6 +72,7 @@ LOCAL_APPS = [
     "apps.bonds",
     "apps.journal",
     "apps.ai",
+    "apps.clinical",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

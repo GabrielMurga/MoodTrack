@@ -21,7 +21,7 @@
       {% if entry.mood %}
         <span class="status-badge">{{ entry.get_mood_display }}</span>
       {% endif %}
-      {% if entry.is_shared_with_psychologist %}
+      {% if entry.is_shared_with_provider %}
         <span class="status-badge status-active">Compartilhado</span>
       {% else %}
         <span class="status-badge">Privado</span>
@@ -36,7 +36,7 @@
       <a href="{% url 'journal:patient_journal_edit' entry.id %}"><button type="button">Editar</button></a>
       <form method="post" action="{% url 'journal:patient_journal_toggle_share' entry.id %}" class="inline">
         {% csrf_token %}
-        {% if entry.is_shared_with_psychologist %}
+        {% if entry.is_shared_with_provider %}
           <button type="submit">Tornar privado</button>
         {% else %}
           <button type="submit">Compartilhar</button>

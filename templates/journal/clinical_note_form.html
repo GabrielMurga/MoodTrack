@@ -2,7 +2,7 @@
 {% block title %}{% if mode == "create" %}Nova anotação{% else %}Editar anotação{% endif %} — MoodTrack{% endblock %}
 
 {% block content %}
-<p><a href="{% url 'journal:psychologist_patient_detail' bond.patient.id %}">← Voltar para paciente</a></p>
+<p><a href="{% url 'journal:provider_patient_detail' bond.patient.id %}">← Voltar para paciente</a></p>
 
 <h1>{% if mode == "create" %}Nova anotação clínica{% else %}Editar anotação{% endif %}</h1>
 <p style="color: #666;">
@@ -26,6 +26,6 @@
   </p>
 
   <button type="submit">{% if mode == "create" %}Salvar{% else %}Atualizar{% endif %}</button>
-  <a href="{% url 'journal:psychologist_patient_detail' bond.patient.id %}">Cancelar</a>
+  <a href="{% url 'journal:provider_patient_detail' bond.patient.id %}">Cancelar</a>
 </form>
 {% endblock %}

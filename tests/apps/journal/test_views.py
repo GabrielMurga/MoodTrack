@@ -20,10 +20,12 @@ from apps.journal.models import (
 from tests.factories import (
     BondFactory,
     ClinicalNoteFactory,
+    HealthcareProviderFactory,
     JournalEntryFactory,
+    MedicationFactory,
     MoodLogFactory,
     PatientProfileFactory,
-    PsychologistProfileFactory,
+    PsychiatristProviderFactory,
 )
 
 pytestmark = pytest.mark.django_db
@@ -45,9 +47,9 @@ class TestPatientMoodViews:
         resp = client.get(reverse("journal:patient_mood_list"))
         assert resp.status_code == 302
 
-    def test_psychologist_blocked_from_mood_list(self, client):
-        psych = PsychologistProfileFactory()
-        _login(client, psych.user)
+    def test_provider_blocked_from_mood_list(self, client):
+        provider = HealthcareProviderFactory()
+        _login(client, provider.user)
         resp = client.get(reverse("journal:patient_mood_list"))
         assert resp.status_code == 404
 
@@ -71,7 +73,7 @@ class TestPatientMoodViews:
             {"mood": MoodLevel.NEUTRAL},
         )
         log = MoodLog.objects.for_patient(patient).first()
-        assert log.is_shared_with_psychologist is False
+        assert log.is_shared_with_provider is False
 
     def test_toggle_share_audited(self, client):
         patient = PatientProfileFactory()
@@ -79,7 +81,7 @@ class TestPatientMoodViews:
         _login(client, patient.user)
         client.post(reverse("journal:patient_mood_toggle_share", args=[log.id]))
         log.refresh_from_db()
-        assert log.is_shared_with_psychologist is True
+        assert log.is_shared_with_provider is True
         assert AuditLog.objects.filter(action="mood_log.share_toggled").count() == 1
 
 
@@ -99,7 +101,7 @@ class TestPatientJournalViews:
                 "title": "",
                 "content": "Hoje pensei em algo.",
                 "mood": "",  # opcional
-                "is_shared_with_psychologist": "on",
+                "is_shared_with_provider": "on",
             },
             follow=True,
         )
@@ -109,7 +111,7 @@ class TestPatientJournalViews:
         e = entries.first()
         assert e.kind == JournalEntryKind.THOUGHT
         assert e.mood is None
-        assert e.is_shared_with_psychologist is True
+        assert e.is_shared_with_provider is True
 
     def test_cannot_edit_others_entry(self, client):
         owner = PatientProfileFactory()
@@ -121,25 +123,25 @@ class TestPatientJournalViews:
 
 
 # ---------------------------------------------------------------------------
-# ClinicalNote — psicólogo only, visibilidade unilateral
+# ClinicalNote — provider only, visibilidade unilateral
 # ---------------------------------------------------------------------------
 
 
 class TestClinicalNoteViews:
     def test_patient_blocked_from_clinical_note_create(self, client):
         """Paciente NUNCA acessa rotas de ClinicalNote."""
-        psych = PsychologistProfileFactory()
+        provider = HealthcareProviderFactory()
         patient = PatientProfileFactory()
-        BondFactory(active=True, psychologist=psych, patient=patient)
+        BondFactory(active=True, provider=provider, patient=patient)
         _login(client, patient.user)
         resp = client.get(reverse("journal:clinical_note_create", args=[patient.id]))
         assert resp.status_code == 404
 
-    def test_psychologist_creates_clinical_note(self, client):
-        psych = PsychologistProfileFactory()
+    def test_provider_creates_clinical_note(self, client):
+        provider = HealthcareProviderFactory()
         patient = PatientProfileFactory()
-        BondFactory(active=True, psychologist=psych, patient=patient)
-        _login(client, psych.user)
+        BondFactory(active=True, provider=provider, patient=patient)
+        _login(client, provider.user)
 
         resp = client.post(
             reverse("journal:clinical_note_create", args=[patient.id]),
@@ -147,13 +149,13 @@ class TestClinicalNoteViews:
             follow=True,
         )
         assert resp.status_code == 200
-        assert ClinicalNote.objects.for_psychologist(psych).count() == 1
+        assert ClinicalNote.objects.for_provider(provider).count() == 1
         assert AuditLog.objects.filter(action="clinical_note.created").count() == 1
 
-    def test_psychologist_cannot_create_note_for_unbonded_patient(self, client):
-        psych = PsychologistProfileFactory()
+    def test_provider_cannot_create_note_for_unbonded_patient(self, client):
+        provider = HealthcareProviderFactory()
         unrelated_patient = PatientProfileFactory()
-        _login(client, psych.user)
+        _login(client, provider.user)
         resp = client.post(
             reverse("journal:clinical_note_create", args=[unrelated_patient.id]),
             {"content": "x"},
@@ -161,54 +163,52 @@ class TestClinicalNoteViews:
         assert resp.status_code == 404
         assert ClinicalNote.objects.count() == 0
 
-    def test_psychologist_cannot_edit_others_note(self, client):
-        psych_a = PsychologistProfileFactory()
-        psych_b = PsychologistProfileFactory()
-        note_b = ClinicalNoteFactory(bond=BondFactory(active=True, psychologist=psych_b))
+    def test_provider_cannot_edit_others_note(self, client):
+        provider_a = HealthcareProviderFactory()
+        provider_b = HealthcareProviderFactory()
+        note_b = ClinicalNoteFactory(bond=BondFactory(active=True, provider=provider_b))
 
-        _login(client, psych_a.user)
+        _login(client, provider_a.user)
         resp = client.get(reverse("journal:clinical_note_edit", args=[note_b.id]))
         assert resp.status_code == 404
 
 
 # ---------------------------------------------------------------------------
-# Timeline do psicólogo — combina mood + journal + clinical notes
+# Timeline do profissional — combina mood + journal + clinical notes
 # ---------------------------------------------------------------------------
 
 
-class TestPsychologistTimeline:
+class TestProviderTimeline:
     def test_timeline_shows_only_shared_and_own_clinical_notes(self, client):
-        psych = PsychologistProfileFactory()
+        provider = HealthcareProviderFactory()
         patient = PatientProfileFactory()
-        bond = BondFactory(active=True, psychologist=psych, patient=patient)
+        bond = BondFactory(active=True, provider=provider, patient=patient)
 
         # Paciente: 1 shared + 1 privado em cada tipo
-        MoodLogFactory(patient=patient, is_shared_with_psychologist=False)
-        MoodLogFactory(patient=patient, is_shared_with_psychologist=True)
+        MoodLogFactory(patient=patient, is_shared_with_provider=False)
+        MoodLogFactory(patient=patient, is_shared_with_provider=True)
         JournalEntryFactory(
             patient=patient,
             content="PRIVADO_xyz",
-            is_shared_with_psychologist=False,
+            is_shared_with_provider=False,
         )
         JournalEntryFactory(
             patient=patient,
             content="COMPARTILHADO_abc",
-            is_shared_with_psychologist=True,
+            is_shared_with_provider=True,
         )
 
-        # ClinicalNote — só do psicólogo logado
+        # ClinicalNote — só do profissional logado
         ClinicalNoteFactory(bond=bond, content="MINHA_NOTA_42")
-        # Outro psicólogo — nota não deve aparecer aqui
-        other_psych = PsychologistProfileFactory()
+        # Outro profissional — nota não deve aparecer aqui
+        other_provider = HealthcareProviderFactory()
         ClinicalNoteFactory(
-            bond=BondFactory(active=True, psychologist=other_psych, patient=patient),
+            bond=BondFactory(active=True, provider=other_provider, patient=patient),
             content="NOTA_DO_OUTRO_99",
         )
 
-        _login(client, psych.user)
-        resp = client.get(
-            reverse("journal:psychologist_patient_detail", args=[patient.id])
-        )
+        _login(client, provider.user)
+        resp = client.get(reverse("journal:provider_patient_detail", args=[patient.id]))
         assert resp.status_code == 200
 
         # Privado do paciente não vaza
@@ -217,19 +217,105 @@ class TestPsychologistTimeline:
         assert b"COMPARTILHADO_abc" in resp.content
         # Própria nota aparece
         assert b"MINHA_NOTA_42" in resp.content
-        # Nota de outro psicólogo nunca vaza
+        # Nota de outro profissional nunca vaza
         assert b"NOTA_DO_OUTRO_99" not in resp.content
 
         # Audit registrado
-        assert AuditLog.objects.filter(
-            action="patient_timeline.viewed", actor=psych.user
-        ).count() == 1
+        assert (
+            AuditLog.objects.filter(action="patient_timeline.viewed", actor=provider.user).count()
+            == 1
+        )
 
     def test_unbonded_patient_returns_404(self, client):
-        psych = PsychologistProfileFactory()
+        provider = HealthcareProviderFactory()
         unrelated = PatientProfileFactory()
-        _login(client, psych.user)
-        resp = client.get(
-            reverse("journal:psychologist_patient_detail", args=[unrelated.id])
-        )
+        _login(client, provider.user)
+        resp = client.get(reverse("journal:provider_patient_detail", args=[unrelated.id]))
         assert resp.status_code == 404
+
+
+class TestProviderSession:
+    def test_requires_login(self, client):
+        resp = client.get(reverse("journal:provider_session", args=[1]))
+        assert resp.status_code == 302
+
+    def test_patient_blocked(self, client):
+        patient = PatientProfileFactory()
+        _login(client, patient.user)
+        resp = client.get(reverse("journal:provider_session", args=[1]))
+        assert resp.status_code == 404
+
+    def test_unbonded_provider_gets_404(self, client):
+        provider = HealthcareProviderFactory()
+        unrelated = PatientProfileFactory()
+        _login(client, provider.user)
+        resp = client.get(reverse("journal:provider_session", args=[unrelated.id]))
+        assert resp.status_code == 404
+
+    def test_psychologist_can_access_session(self, client):
+        provider = HealthcareProviderFactory()  # psicólogo (default)
+        patient = PatientProfileFactory()
+        BondFactory(active=True, provider=provider, patient=patient)
+        _login(client, provider.user)
+        resp = client.get(reverse("journal:provider_session", args=[patient.id]))
+        assert resp.status_code == 200
+
+    def test_psychiatrist_can_access_session(self, client):
+        provider = PsychiatristProviderFactory()
+        patient = PatientProfileFactory()
+        BondFactory(active=True, provider=provider, patient=patient)
+        _login(client, provider.user)
+        resp = client.get(reverse("journal:provider_session", args=[patient.id]))
+        assert resp.status_code == 200
+
+    def test_session_shows_active_medications(self, client):
+        provider = HealthcareProviderFactory()  # psicólogo vê meds prescritas
+        psiquiatra = PsychiatristProviderFactory()
+        patient = PatientProfileFactory()
+        BondFactory(active=True, provider=provider, patient=patient)
+        BondFactory(active=True, provider=psiquiatra, patient=patient)
+        MedicationFactory(
+            patient=patient, prescribed_by=psiquiatra, name="MEDICAMENTO_VISIVEL_777"
+        )
+
+        _login(client, provider.user)
+        resp = client.get(reverse("journal:provider_session", args=[patient.id]))
+        assert resp.status_code == 200
+        assert b"MEDICAMENTO_VISIVEL_777" in resp.content
+
+    def test_session_shows_recent_notes(self, client):
+        provider = HealthcareProviderFactory()
+        patient = PatientProfileFactory()
+        bond = BondFactory(active=True, provider=provider, patient=patient)
+        ClinicalNoteFactory(bond=bond, content="NOTA_ANTERIOR_555")
+
+        _login(client, provider.user)
+        resp = client.get(reverse("journal:provider_session", args=[patient.id]))
+        assert resp.status_code == 200
+        assert b"NOTA_ANTERIOR_555" in resp.content
+
+    def test_save_note_from_session_view(self, client):
+        provider = HealthcareProviderFactory()
+        patient = PatientProfileFactory()
+        bond = BondFactory(active=True, provider=provider, patient=patient)
+
+        _login(client, provider.user)
+        resp = client.post(
+            reverse("journal:provider_session", args=[patient.id]),
+            {"content": "Conteúdo da sessão de hoje", "session_date": ""},
+        )
+        assert resp.status_code == 302
+        assert ClinicalNote.objects.filter(bond=bond).count() == 1
+        assert AuditLog.objects.filter(
+            action="clinical_note.created", actor=provider.user
+        ).exists()
+
+    def test_session_open_emits_audit(self, client):
+        provider = HealthcareProviderFactory()
+        patient = PatientProfileFactory()
+        BondFactory(active=True, provider=provider, patient=patient)
+        _login(client, provider.user)
+        client.get(reverse("journal:provider_session", args=[patient.id]))
+        assert AuditLog.objects.filter(
+            action="provider_session.opened", actor=provider.user
+        ).exists()

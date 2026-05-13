@@ -96,19 +96,19 @@ class TestSessionBriefing:
         JournalEntryFactory(
             patient=bond.patient,
             content="Compartilhado.",
-            is_shared_with_psychologist=True,
+            is_shared_with_provider=True,
         )
         # Uma privada — NÃO deve aparecer na geração
         JournalEntryFactory(
             patient=bond.patient,
             content="PRIVADO_NAO_VAZA",
-            is_shared_with_psychologist=False,
+            is_shared_with_provider=False,
         )
 
         client = _make_mock_client("Briefing gerado.")
         result = generate_session_briefing(
             bond,
-            actor=bond.psychologist.user,
+            actor=bond.provider.user,
             client=client,
             pseudo=_make_mock_pseudo(),
         )
@@ -126,7 +126,7 @@ class TestSessionBriefing:
         bond = BondFactory(active=True)
         generate_session_briefing(
             bond,
-            actor=bond.psychologist.user,
+            actor=bond.provider.user,
             client=_make_mock_client(),
             pseudo=_make_mock_pseudo(),
         )

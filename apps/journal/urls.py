@@ -13,7 +13,6 @@ urlpatterns = [
         views.patient_mood_toggle_share,
         name="patient_mood_toggle_share",
     ),
-
     # Paciente — diário de eventos
     path("diario/eventos/", views.patient_journal_list, name="patient_journal_list"),
     path(
@@ -31,13 +30,17 @@ urlpatterns = [
         views.patient_journal_toggle_share,
         name="patient_journal_toggle_share",
     ),
-
-    # Psicólogo
-    path("pacientes/", views.psychologist_patient_list, name="psychologist_patients"),
+    # Profissional (psicólogo / psiquiatra)
+    path("pacientes/", views.provider_patient_list, name="provider_patients"),
     path(
         "pacientes/<int:patient_id>/",
-        views.psychologist_patient_detail,
-        name="psychologist_patient_detail",
+        views.provider_patient_detail,
+        name="provider_patient_detail",
+    ),
+    path(
+        "pacientes/<int:patient_id>/consulta/",
+        views.provider_session,
+        name="provider_session",
     ),
     path(
         "pacientes/<int:patient_id>/anotacao/",

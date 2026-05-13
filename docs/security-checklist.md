@@ -52,12 +52,12 @@ Confirmado em código + testes:
 
 - ✅ **Criptografia em nível de aplicação** dos campos sensíveis
   (`MoodEntry.content`) via Fernet — chave separada do DB (ADR 0006).
-- ✅ **Default privado** (`is_shared_with_psychologist=False`) — CLAUDE.md
+- ✅ **Default privado** (`is_shared_with_provider=False`) — CLAUDE.md
   regra 3.
-- ✅ **Vínculo paciente-psicólogo de dois lados** com state machine
+- ✅ **Vínculo paciente-profissional de dois lados** com state machine
   (CLAUDE.md regra 4).
-- ✅ **Fail-closed em queryset** — `Bond.objects.for_user/for_psychologist
-  /for_patient`, `MoodEntry.objects.shared_with_psychologist`. Sem perfil
+- ✅ **Fail-closed em queryset** — `Bond.objects.for_user/for_provider
+  /for_patient`, `MoodLog.objects.shared_with_provider`. Sem perfil
   ou sem bond ativo retorna queryset vazio (CLAUDE.md regras 5, 6, 7).
 - ✅ **Validação de input via Forms** — DRF ainda não usado, formulários
   Django cobrem o que existe (CLAUDE.md regra 9).

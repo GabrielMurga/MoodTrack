@@ -1,16 +1,21 @@
 """Modelos de identidade.
 
-MoodTrack autentica usuários finais (psicólogos e pacientes) exclusivamente via
-OAuth social (CLAUDE.md regra 12). O campo `password` permanece no modelo porque
-é parte do contrato do AbstractBaseUser do Django, mas para usuários criados
-pelo fluxo OAuth ele é sempre "unusable" — `set_unusable_password()` é chamado.
+MoodTrack autentica usuários finais (profissionais de saúde e pacientes)
+exclusivamente via OAuth social (CLAUDE.md regra 12). O campo `password`
+permanece no modelo porque é parte do contrato do AbstractBaseUser do Django,
+mas para usuários criados pelo fluxo OAuth ele é sempre "unusable" —
+`set_unusable_password()` é chamado.
 
 Senha utilizável só é definida via `createsuperuser` (uso de ops/dev) ou pelo
 seed de desenvolvimento. Nenhum endpoint público aceita senha.
 
-Um mesmo User pode ter `PsychologistProfile` E `PatientProfile` simultaneamente
-(psicóloga que também faz terapia, por exemplo). Os perfis são OneToOne
+Um mesmo User pode ter `HealthcareProvider` E `PatientProfile` simultaneamente
+(profissional que também faz terapia, por exemplo). Os perfis são OneToOne
 opcionais; o User permanece neutro quanto ao papel.
+
+`HealthcareProvider` (ADR 0009) cobre tanto psicólogo quanto psiquiatra,
+diferenciados pelo campo `kind`. Detalhes que divergem entre os dois (CRP/CRM,
+capacidade de prescrição) ficam no próprio model, condicionais ao `kind`.
 """
 
 from __future__ import annotations
@@ -106,45 +111,138 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.full_name.split()[0] if self.full_name else self.email
 
     @property
+    def is_provider(self) -> bool:
+        return hasattr(self, "provider_profile")
+
+    @property
     def is_psychologist(self) -> bool:
-        return hasattr(self, "psychologist_profile")
+        return self.is_provider and self.provider_profile.kind == ProviderKind.PSYCHOLOGIST
+
+    @property
+    def is_psychiatrist(self) -> bool:
+        return self.is_provider and self.provider_profile.kind == ProviderKind.PSYCHIATRIST
 
     @property
     def is_patient(self) -> bool:
         return hasattr(self, "patient_profile")
 
 
-class PsychologistProfile(models.Model):
-    """Perfil profissional do psicólogo.
+class ProviderKind(models.TextChoices):
+    PSYCHOLOGIST = "psychologist", _("Psicólogo")
+    PSYCHIATRIST = "psychiatrist", _("Psiquiatra")
 
-    Validação real do CRP contra base do CFP fica para iteração futura;
-    nesta fatia o campo é free-text. Bio e especialidade são placeholders
-    para evolução do perfil público profissional.
+
+class ProviderPlan(models.TextChoices):
+    """Tier de assinatura do profissional (ADR 0010).
+
+    - BASIC: sem acesso a IA. Plataforma + timeline + anotações clínicas.
+    - PRO: IA com cota dimensionada para o uso típico.
+    - PREMIUM: IA praticamente ilimitada (limites apenas anti-abuse).
+
+    Default em criação é BASIC. Promoção para PRO/PREMIUM acontece via
+    side-effect de pagamento confirmado (futuro). No MVP, alteração manual
+    pelo admin Django.
+    """
+
+    BASIC = "basic", _("Básico")
+    PRO = "pro", _("Pro")
+    PREMIUM = "premium", _("Premium")
+
+
+class HealthcareProvider(models.Model):
+    """Perfil profissional unificado (psicólogo ou psiquiatra).
+
+    Ver ADR 0009. O campo `kind` define se é psicólogo ou psiquiatra; CRP é
+    preenchido apenas para psicólogo, CRM apenas para psiquiatra. Capacidade
+    de prescrição é derivada de `kind` (psiquiatra prescreve, psicólogo não)
+    e usada em validação fail-closed nos models que tratam medicação.
+
+    Validação real de CRP/CRM contra base oficial do CFP/CFM fica para
+    iteração futura; nesta fatia ambos são free-text com restrição de
+    consistência (CheckConstraint + clean()).
     """
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="psychologist_profile",
+        related_name="provider_profile",
         verbose_name=_("usuário"),
+    )
+    kind = models.CharField(
+        _("tipo de profissional"),
+        max_length=20,
+        choices=ProviderKind.choices,
     )
     crp_number = models.CharField(
         _("CRP"),
         max_length=20,
         blank=True,
-        help_text=_("Número do CRP (Conselho Regional de Psicologia). Validação de formato é futura."),
+        help_text=_(
+            "Número do CRP (Conselho Regional de Psicologia). Preenchido "
+            "apenas quando o tipo é psicólogo. Validação de formato é futura."
+        ),
+    )
+    crm_number = models.CharField(
+        _("CRM"),
+        max_length=20,
+        blank=True,
+        help_text=_(
+            "Número do CRM (Conselho Regional de Medicina). Preenchido apenas "
+            "quando o tipo é psiquiatra. Validação de formato é futura."
+        ),
     )
     bio = models.TextField(_("biografia profissional"), blank=True)
+
+    plan = models.CharField(
+        _("plano"),
+        max_length=10,
+        choices=ProviderPlan.choices,
+        default=ProviderPlan.BASIC,
+        help_text=_(
+            "Tier de assinatura. Define acesso a IA e cota — ver ADR 0010. "
+            "Profissional novo nasce em Básico (sem IA) por default."
+        ),
+    )
 
     created_at = models.DateTimeField(_("criado em"), auto_now_add=True)
     updated_at = models.DateTimeField(_("atualizado em"), auto_now=True)
 
     class Meta:
-        verbose_name = _("perfil de psicólogo")
-        verbose_name_plural = _("perfis de psicólogo")
+        verbose_name = _("perfil de profissional")
+        verbose_name_plural = _("perfis de profissional")
+        constraints = [
+            # Garante que o número de registro corresponde ao tipo: psicólogo
+            # não pode ter CRM preenchido, psiquiatra não pode ter CRP. Free-
+            # text continua possível dentro do tipo correto.
+            models.CheckConstraint(
+                condition=(
+                    models.Q(kind="psychologist", crm_number="")
+                    | models.Q(kind="psychiatrist", crp_number="")
+                ),
+                name="provider_register_number_matches_kind",
+            ),
+        ]
 
     def __str__(self) -> str:
-        return f"Psicólogo: {self.user.email}"
+        return f"{self.get_kind_display()}: {self.user.email}"
+
+    @property
+    def can_prescribe(self) -> bool:
+        return self.kind == ProviderKind.PSYCHIATRIST
+
+    @property
+    def has_ai_access(self) -> bool:
+        """Plano dá direito a usar IA? Cota é decisão separada (ver apps/ai/access)."""
+        return self.plan != ProviderPlan.BASIC
+
+    def clean(self) -> None:
+        from django.core.exceptions import ValidationError
+
+        super().clean()
+        if self.kind == ProviderKind.PSYCHOLOGIST and self.crm_number:
+            raise ValidationError({"crm_number": _("Psicólogo não preenche CRM.")})
+        if self.kind == ProviderKind.PSYCHIATRIST and self.crp_number:
+            raise ValidationError({"crp_number": _("Psiquiatra não preenche CRP.")})
 
 
 class PatientProfile(models.Model):
@@ -165,7 +263,9 @@ class PatientProfile(models.Model):
         _("nome preferido"),
         max_length=120,
         blank=True,
-        help_text=_("Como o paciente prefere ser chamado. Usado em devolutivas e pelo psicólogo."),
+        help_text=_(
+            "Como o paciente prefere ser chamado. Usado em devolutivas e pelo profissional."
+        ),
     )
     birth_date = models.DateField(_("data de nascimento"), null=True, blank=True)
 
@@ -178,3 +278,18 @@ class PatientProfile(models.Model):
 
     def __str__(self) -> str:
         return f"Paciente: {self.user.email}"
+
+    @property
+    def has_ai_via_bond(self) -> bool:
+        """Tem bond ativo a um profissional cujo plano inclui IA?
+
+        Usado para esconder/mostrar pontos de entrada de IA na UI do paciente.
+        Modo individual (sem bond) ou bond a profissional Básico → False.
+        """
+        from apps.bonds.models import Bond, BondStatus
+
+        return (
+            Bond.objects.filter(patient=self, status=BondStatus.ACTIVE)
+            .exclude(provider__plan=ProviderPlan.BASIC)
+            .exists()
+        )

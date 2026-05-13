@@ -44,9 +44,7 @@ def _load_nlp() -> Language:
 _RE_CPF = re.compile(r"\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b")
 
 # Telefone BR: (XX) 9XXXX-XXXX, XXXXX-XXXX, +55 XX XXXXXXXXX, etc.
-_RE_PHONE = re.compile(
-    r"(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?9?\d{4}[-\s]?\d{4}\b"
-)
+_RE_PHONE = re.compile(r"(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?9?\d{4}[-\s]?\d{4}\b")
 
 # Email
 _RE_EMAIL = re.compile(r"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b")
@@ -176,9 +174,7 @@ class Pseudonymizer:
             ner_matches.append((ent.start_char, ent.end_char, kind, ent.text))
 
         # Combina e aplica do fim pro começo.
-        all_matches = sorted(
-            regex_matches + ner_matches, key=lambda m: m[0], reverse=True
-        )
+        all_matches = sorted(regex_matches + ner_matches, key=lambda m: m[0], reverse=True)
         result = text
         for start, end, kind, original in all_matches:
             placeholder = vault.store(kind, original)

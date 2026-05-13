@@ -9,6 +9,8 @@ porque é uma síntese feita a partir de dados sensíveis do paciente.
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -35,11 +37,11 @@ class AISummaryQuerySet(models.QuerySet):
             target_bond=bond,
         )
 
-    def for_psychologist(self, profile) -> AISummaryQuerySet:
-        """Todos os briefings de bonds onde este psicólogo é dono."""
+    def for_provider(self, profile) -> AISummaryQuerySet:
+        """Todos os briefings de bonds onde este profissional é dono."""
         return self.filter(
             kind=AISummaryKind.SESSION_BRIEFING,
-            target_bond__psychologist=profile,
+            target_bond__provider=profile,
         )
 
 
@@ -95,8 +97,16 @@ class AISummary(models.Model):
             # SESSION_BRIEFING precisa de target_bond.
             models.CheckConstraint(
                 condition=(
-                    models.Q(kind="weekly_patient", target_patient__isnull=False, target_bond__isnull=True)
-                    | models.Q(kind="session_briefing", target_bond__isnull=False, target_patient__isnull=True)
+                    models.Q(
+                        kind="weekly_patient",
+                        target_patient__isnull=False,
+                        target_bond__isnull=True,
+                    )
+                    | models.Q(
+                        kind="session_briefing",
+                        target_bond__isnull=False,
+                        target_patient__isnull=True,
+                    )
                 ),
                 name="aisummary_kind_target_consistency",
             ),
@@ -108,3 +118,56 @@ class AISummary(models.Model):
     def __str__(self) -> str:
         target = self.target_patient or self.target_bond
         return f"AISummary#{self.id} [{self.get_kind_display()}] → {target}"
+
+
+class AIUsageCounter(models.Model):
+    """Contador mensal de uso de IA por profissional (ADR 0010).
+
+    Uma linha por (provider, primeiro dia do mês). Incrementado a cada
+    operação de IA bem-sucedida via `apps.ai.access.record_usage`.
+
+    Coarse-grained por design: detalhamento por chamada já existe em
+    `apps.audit` (CLAUDE.md regra 8/15). Este contador serve para
+    comparação rápida contra o limite do plano sem fazer COUNT em audit.
+    """
+
+    provider = models.ForeignKey(
+        "accounts.HealthcareProvider",
+        on_delete=models.CASCADE,
+        related_name="ai_usage_counters",
+        verbose_name=_("profissional"),
+    )
+    period = models.DateField(
+        _("período (1º dia do mês)"),
+        db_index=True,
+        help_text=_(
+            "Primeiro dia do mês a que se refere a contagem. "
+            "Reset implícito: novo mês = nova linha."
+        ),
+    )
+    count = models.PositiveIntegerField(_("usos no período"), default=0)
+    cost_brl = models.DecimalField(
+        _("custo acumulado (R$)"),
+        max_digits=10,
+        decimal_places=6,
+        default=Decimal("0"),
+        help_text=_("Custo total de chamadas à LLM no período, em reais."),
+    )
+
+    updated_at = models.DateTimeField(_("atualizado em"), auto_now=True)
+
+    class Meta:
+        verbose_name = _("contador de uso de IA")
+        verbose_name_plural = _("contadores de uso de IA")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["provider", "period"],
+                name="unique_ai_usage_counter_per_period",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["provider", "-period"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"AIUsageCounter[{self.provider_id} @ {self.period:%Y-%m}] = {self.count}"

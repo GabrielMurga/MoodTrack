@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Configurar perfil — MoodTrack{% endblock %}
+
+{% block content %}
+<h1>Bem-vindo ao MoodTrack</h1>
+<p style="color: #666;">
+  Para começar, conte como você vai usar a plataforma.
+</p>
+
+<div class="card" style="margin-top: 1.5rem;">
+  <h2 style="margin-top: 0;">Sou paciente</h2>
+  <p style="color: #555;">
+    Quero acompanhar meu cotidiano emocional. Posso usar sozinho ou
+    me vincular a um profissional que me enviou um código.
+  </p>
+  <p>
+    <a href="{% url 'accounts:create_patient_profile' %}">
+      <button type="button">Criar perfil de paciente</button>
+    </a>
+  </p>
+</div>
+
+<div class="card">
+  <h2 style="margin-top: 0;">Sou profissional</h2>
+  <p style="color: #555;">
+    Sou psicólogo ou psiquiatra e quero acompanhar meus pacientes
+    pela plataforma.
+  </p>
+  <p>
+    <a href="{% url 'accounts:create_provider_profile' %}">
+      <button type="button">Criar perfil de profissional</button>
+    </a>
+  </p>
+</div>
+
+<p style="margin-top: 1.5rem; color: #888; font-size: 0.9rem;">
+  Você pode ter os dois perfis se quiser (profissional que também faz terapia).
+  Comece por um — pode adicionar o outro depois.
+</p>
+{% endblock %}

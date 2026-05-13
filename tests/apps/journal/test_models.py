@@ -22,10 +22,10 @@ from apps.journal.models import (
 from tests.factories import (
     BondFactory,
     ClinicalNoteFactory,
+    HealthcareProviderFactory,
     JournalEntryFactory,
     MoodLogFactory,
     PatientProfileFactory,
-    PsychologistProfileFactory,
 )
 
 pytestmark = pytest.mark.django_db
@@ -38,10 +38,8 @@ pytestmark = pytest.mark.django_db
 
 class TestMoodLog:
     def test_default_visibility_is_private(self):
-        log = MoodLog.objects.create(
-            patient=PatientProfileFactory(), mood=MoodLevel.NEUTRAL
-        )
-        assert log.is_shared_with_psychologist is False
+        log = MoodLog.objects.create(patient=PatientProfileFactory(), mood=MoodLevel.NEUTRAL)
+        assert log.is_shared_with_provider is False
 
     def test_for_patient_filters_owner(self):
         a = PatientProfileFactory()
@@ -51,25 +49,25 @@ class TestMoodLog:
 
         assert MoodLog.objects.for_patient(a).count() == 1
 
-    def test_shared_with_psychologist_double_filter(self):
-        psych = PsychologistProfileFactory()
+    def test_shared_with_provider_double_filter(self):
+        provider = HealthcareProviderFactory()
         patient = PatientProfileFactory()
-        BondFactory(active=True, psychologist=psych, patient=patient)
+        BondFactory(active=True, provider=provider, patient=patient)
 
-        MoodLogFactory(patient=patient, is_shared_with_psychologist=False)
-        shared = MoodLogFactory(patient=patient, is_shared_with_psychologist=True)
+        MoodLogFactory(patient=patient, is_shared_with_provider=False)
+        shared = MoodLogFactory(patient=patient, is_shared_with_provider=True)
 
-        visible = MoodLog.objects.shared_with_psychologist(psych)
+        visible = MoodLog.objects.shared_with_provider(provider)
         assert visible.count() == 1
         assert visible.first().pk == shared.pk
 
-    def test_shared_with_psychologist_excludes_inactive_bond(self):
-        psych = PsychologistProfileFactory()
+    def test_shared_with_provider_excludes_inactive_bond(self):
+        provider = HealthcareProviderFactory()
         patient = PatientProfileFactory()
-        BondFactory(ended=True, psychologist=psych, patient=patient)
-        MoodLogFactory(patient=patient, is_shared_with_psychologist=True)
+        BondFactory(ended=True, provider=provider, patient=patient)
+        MoodLogFactory(patient=patient, is_shared_with_provider=True)
 
-        assert MoodLog.objects.shared_with_psychologist(psych).count() == 0
+        assert MoodLog.objects.shared_with_provider(provider).count() == 0
 
 
 # ===========================================================================
@@ -84,7 +82,7 @@ class TestJournalEntry:
             kind=JournalEntryKind.SITUATION,
             content="qualquer",
         )
-        assert entry.is_shared_with_psychologist is False
+        assert entry.is_shared_with_provider is False
         assert entry.mood is None
 
     def test_mood_optional(self):
@@ -119,37 +117,35 @@ class TestJournalEntry:
         reloaded = JournalEntry.objects.get(pk=entry.pk)
         assert reloaded.content == secret
 
-    def test_shared_with_psychologist_filters_correctly(self):
-        psych = PsychologistProfileFactory()
+    def test_shared_with_provider_filters_correctly(self):
+        provider = HealthcareProviderFactory()
         patient = PatientProfileFactory()
-        BondFactory(active=True, psychologist=psych, patient=patient)
+        BondFactory(active=True, provider=provider, patient=patient)
 
-        JournalEntryFactory(patient=patient, is_shared_with_psychologist=False)
-        shared = JournalEntryFactory(
-            patient=patient, is_shared_with_psychologist=True
-        )
+        JournalEntryFactory(patient=patient, is_shared_with_provider=False)
+        shared = JournalEntryFactory(patient=patient, is_shared_with_provider=True)
 
-        visible = JournalEntry.objects.shared_with_psychologist(psych)
+        visible = JournalEntry.objects.shared_with_provider(provider)
         assert visible.count() == 1
         assert visible.first().pk == shared.pk
 
 
 # ===========================================================================
-# ClinicalNote — visibilidade unilateral (psicólogo só)
+# ClinicalNote — visibilidade unilateral (profissional só)
 # ===========================================================================
 
 
 class TestClinicalNote:
-    def test_for_psychologist_returns_only_own_notes(self):
-        psych_a = PsychologistProfileFactory()
-        psych_b = PsychologistProfileFactory()
-        bond_a = BondFactory(active=True, psychologist=psych_a)
-        bond_b = BondFactory(active=True, psychologist=psych_b)
+    def test_for_provider_returns_only_own_notes(self):
+        provider_a = HealthcareProviderFactory()
+        provider_b = HealthcareProviderFactory()
+        bond_a = BondFactory(active=True, provider=provider_a)
+        bond_b = BondFactory(active=True, provider=provider_b)
 
         own = ClinicalNoteFactory(bond=bond_a)
         ClinicalNoteFactory(bond=bond_b)
 
-        notes = ClinicalNote.objects.for_psychologist(psych_a)
+        notes = ClinicalNote.objects.for_provider(provider_a)
         assert notes.count() == 1
         assert notes.first().pk == own.pk
 

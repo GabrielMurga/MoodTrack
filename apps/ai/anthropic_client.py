@@ -59,8 +59,7 @@ class AnthropicClient:
     def _ensure_ready(self) -> None:
         if not self.api_key:
             raise AnthropicClientError(
-                "ANTHROPIC_API_KEY não configurada. Defina no .env antes de "
-                "chamar a IA."
+                "ANTHROPIC_API_KEY não configurada. Defina no .env antes de " "chamar a IA."
             )
         if not self.zdr_confirmed:
             raise AnthropicClientError(

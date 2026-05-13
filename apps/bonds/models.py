@@ -1,16 +1,17 @@
-"""Vínculo paciente-psicólogo.
+"""Vínculo paciente-profissional.
 
-O Bond é o relacionamento terapêutico autorizado dentro do MoodTrack.
+O Bond é o relacionamento terapêutico autorizado dentro do MoodTrack, ligando
+um paciente a um `HealthcareProvider` (psicólogo ou psiquiatra — ADR 0009).
 Conforme CLAUDE.md regra 4, o vínculo exige confirmação dos dois lados:
 
-    1. Psicólogo gera convite (Bond criado em estado INVITED, com invite_code).
+    1. Profissional gera convite (Bond criado em estado INVITED, com invite_code).
     2. Paciente recebe o código fora da plataforma e o insere no app
        (INVITED → PENDING_CONFIRMATION; patient é preenchido).
-    3. Psicólogo confirma a conexão (PENDING_CONFIRMATION → ACTIVE).
+    3. Profissional confirma a conexão (PENDING_CONFIRMATION → ACTIVE).
     4. Qualquer lado pode encerrar a qualquer momento (* → ENDED).
 
 Querysets do manager seguem CLAUDE.md regra 6 — fail-closed: filtragem por
-psicólogo/paciente acontece em camada de manager, não em view.
+profissional/paciente acontece em camada de manager, não em view.
 """
 
 from __future__ import annotations
@@ -24,7 +25,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 if TYPE_CHECKING:
-    from apps.accounts.models import PatientProfile, PsychologistProfile, User
+    from apps.accounts.models import HealthcareProvider, PatientProfile, User
 
 
 # Alfabeto Crockford-like sem caracteres ambíguos (0/O, 1/I/L).
@@ -68,8 +69,8 @@ class BondQuerySet(models.QuerySet):
     def active(self) -> BondQuerySet:
         return self.filter(status=BondStatus.ACTIVE)
 
-    def for_psychologist(self, profile: PsychologistProfile) -> BondQuerySet:
-        return self.filter(psychologist=profile)
+    def for_provider(self, profile: HealthcareProvider) -> BondQuerySet:
+        return self.filter(provider=profile)
 
     def for_patient(self, profile: PatientProfile) -> BondQuerySet:
         return self.filter(patient=profile)
@@ -84,19 +85,19 @@ class BondQuerySet(models.QuerySet):
         from django.db.models import Q
 
         filters = Q(pk__in=[])  # vazio por default
-        if hasattr(user, "psychologist_profile"):
-            filters |= Q(psychologist=user.psychologist_profile)
+        if hasattr(user, "provider_profile"):
+            filters |= Q(provider=user.provider_profile)
         if hasattr(user, "patient_profile"):
             filters |= Q(patient=user.patient_profile)
         return self.filter(filters)
 
 
 class Bond(models.Model):
-    psychologist = models.ForeignKey(
-        "accounts.PsychologistProfile",
+    provider = models.ForeignKey(
+        "accounts.HealthcareProvider",
         on_delete=models.PROTECT,
         related_name="bonds",
-        verbose_name=_("psicólogo"),
+        verbose_name=_("profissional"),
     )
     patient = models.ForeignKey(
         "accounts.PatientProfile",
@@ -115,6 +116,17 @@ class Bond(models.Model):
         db_index=True,
         default=generate_invite_code,
     )
+    invitee_label = models.CharField(
+        _("destinatário (memo)"),
+        max_length=120,
+        blank=True,
+        help_text=_(
+            "Memo livre — nome, email ou referência do paciente para quem o convite "
+            "foi gerado. Visível apenas para o profissional. Não compartilhado nem "
+            "validado contra dados reais — serve só para o profissional lembrar a "
+            "quem mandou o código."
+        ),
+    )
     status = models.CharField(
         _("status"),
         max_length=16,
@@ -123,11 +135,9 @@ class Bond(models.Model):
     )
 
     invited_at = models.DateTimeField(_("convite criado em"), auto_now_add=True)
-    patient_entered_at = models.DateTimeField(
-        _("paciente entrou em"), null=True, blank=True
-    )
-    psychologist_confirmed_at = models.DateTimeField(
-        _("psicólogo confirmou em"), null=True, blank=True
+    patient_entered_at = models.DateTimeField(_("paciente entrou em"), null=True, blank=True)
+    provider_confirmed_at = models.DateTimeField(
+        _("profissional confirmou em"), null=True, blank=True
     )
     ended_at = models.DateTimeField(_("encerrado em"), null=True, blank=True)
     ended_by = models.ForeignKey(
@@ -147,7 +157,7 @@ class Bond(models.Model):
         ordering = ("-invited_at",)
         constraints = [
             models.UniqueConstraint(
-                fields=["psychologist", "patient"],
+                fields=["provider", "patient"],
                 condition=models.Q(status__in=("invited", "pending", "active")),
                 name="unique_alive_bond_per_pair",
             ),
@@ -165,8 +175,8 @@ class Bond(models.Model):
     def accept_invite(self, patient: PatientProfile) -> None:
         """Paciente insere o código de convite — INVITED → PENDING_CONFIRMATION.
 
-        Se o paciente é o mesmo User do psicólogo do convite (caso dual:
-        psicóloga que também faz terapia), recusa: ninguém pode ser próprio
+        Se o paciente é o mesmo User do profissional do convite (caso dual:
+        profissional que também faz terapia), recusa: ninguém pode ser próprio
         paciente.
 
         Audit: registra em audit.AuditLog com actor = patient.user.
@@ -177,10 +187,10 @@ class Bond(models.Model):
             raise InvalidBondTransition(
                 f"accept_invite só é válido em INVITED (status atual: {self.status})."
             )
-        if patient.user_id == self.psychologist.user_id:
+        if patient.user_id == self.provider.user_id:
             raise InvalidBondTransition(
                 "Você não pode usar seu próprio código de convite — "
-                "psicólogo e paciente devem ser pessoas diferentes."
+                "profissional e paciente devem ser pessoas diferentes."
             )
         self.patient = patient
         self.status = BondStatus.PENDING_CONFIRMATION
@@ -195,9 +205,9 @@ class Bond(models.Model):
         )
 
     def confirm(self) -> None:
-        """Psicólogo confirma o vínculo — PENDING_CONFIRMATION → ACTIVE.
+        """Profissional confirma o vínculo — PENDING_CONFIRMATION → ACTIVE.
 
-        Audit: registra com actor = self.psychologist.user.
+        Audit: registra com actor = self.provider.user.
         """
         from apps.audit.models import log_event
 
@@ -206,11 +216,11 @@ class Bond(models.Model):
                 f"confirm só é válido em PENDING (status atual: {self.status})."
             )
         self.status = BondStatus.ACTIVE
-        self.psychologist_confirmed_at = timezone.now()
-        self.save(update_fields=["status", "psychologist_confirmed_at"])
+        self.provider_confirmed_at = timezone.now()
+        self.save(update_fields=["status", "provider_confirmed_at"])
 
         log_event(
-            actor=self.psychologist.user,
+            actor=self.provider.user,
             action="bond.confirmed",
             target=self,
         )
@@ -233,7 +243,7 @@ class Bond(models.Model):
             actor=by_user,
             action="bond.ended",
             target=self,
-            previous_status=str(BondStatus.ACTIVE) if self.psychologist_confirmed_at else "pre_active",
+            previous_status=str(BondStatus.ACTIVE) if self.provider_confirmed_at else "pre_active",
         )
 
     # ----- helpers -----

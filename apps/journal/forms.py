@@ -7,10 +7,10 @@ from .models import ClinicalNote, JournalEntry, MoodLevel, MoodLog
 class MoodLogForm(forms.ModelForm):
     class Meta:
         model = MoodLog
-        fields = ("mood", "is_shared_with_psychologist")
+        fields = ("mood", "is_shared_with_provider")
         widgets = {"mood": forms.RadioSelect()}
         labels = {
-            "is_shared_with_psychologist": _("Compartilhar com meu psicólogo"),
+            "is_shared_with_provider": _("Compartilhar com meu profissional"),
         }
 
 
@@ -26,12 +26,17 @@ class JournalEntryForm(forms.ModelForm):
 
     class Meta:
         model = JournalEntry
-        fields = ("kind", "title", "content", "mood", "is_shared_with_psychologist")
+        fields = ("kind", "title", "content", "mood", "is_shared_with_provider")
         widgets = {
-            "content": forms.Textarea(attrs={"rows": 6, "placeholder": "Descreva o que aconteceu, o que pensou, o que sentiu…"}),
+            "content": forms.Textarea(
+                attrs={
+                    "rows": 6,
+                    "placeholder": "Descreva o que aconteceu, o que pensou, o que sentiu…",
+                }
+            ),
         }
         labels = {
-            "is_shared_with_psychologist": _("Compartilhar com meu psicólogo"),
+            "is_shared_with_provider": _("Compartilhar com meu profissional"),
         }
 
 
@@ -41,5 +46,10 @@ class ClinicalNoteForm(forms.ModelForm):
         fields = ("session_date", "content")
         widgets = {
             "session_date": forms.DateInput(attrs={"type": "date"}),
-            "content": forms.Textarea(attrs={"rows": 8, "placeholder": "Anotações da sessão, hipóteses, plano para a próxima…"}),
+            "content": forms.Textarea(
+                attrs={
+                    "rows": 8,
+                    "placeholder": "Anotações da sessão, hipóteses, plano para a próxima…",
+                }
+            ),
         }

@@ -9,12 +9,12 @@ urlpatterns = [
     path("diario/insights/gerar/", views.patient_generate_weekly, name="patient_generate_weekly"),
     path(
         "pacientes/<int:patient_id>/briefing/gerar/",
-        views.psychologist_generate_briefing,
-        name="psychologist_generate_briefing",
+        views.provider_generate_briefing,
+        name="provider_generate_briefing",
     ),
     path(
         "pacientes/<int:patient_id>/briefing/",
-        views.psychologist_briefing_detail,
-        name="psychologist_briefing_detail",
+        views.provider_briefing_detail,
+        name="provider_briefing_detail",
     ),
 ]

@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}{{ patient.user.email }} — MoodTrack{% endblock %}
+
+{% block content %}
+<p><a href="{% url 'journal:provider_patients' %}">← Voltar</a></p>
+
+<h1>{{ patient.user.get_full_name }}</h1>
+<p style="color: #666;">{{ patient.user.email }} · vínculo desde {{ bond.provider_confirmed_at|date:"d/m/Y" }}</p>
+
+<p style="margin-top: 1rem; display: flex; gap: 0.6rem;">
+  <a href="{% url 'journal:provider_session' patient.id %}"><button type="button">Iniciar consulta</button></a>
+  {% if user.provider_profile.has_ai_access %}
+    <a href="{% url 'ai:provider_briefing_detail' patient.id %}"><button type="button">Ver / gerar briefing</button></a>
+  {% endif %}
+</p>
+
+{# ---- Medicações (visível para psicólogo e psiquiatra) ---- #}
+<h2 style="margin-top: 2rem;">Medicações prescritas</h2>
+{% if user.provider_profile.can_prescribe %}
+  <p>
+    <a href="{% url 'clinical:medication_create' patient.id %}"><button>+ Nova prescrição</button></a>
+  </p>
+{% endif %}
+
+{% if medications %}
+  {% for med in medications %}
+    <div class="card">
+      <div style="display: flex; align-items: flex-start; gap: 0.6rem;">
+        <div style="flex: 1;">
+          <strong>{{ med.name }}</strong>
+          {% if med.dosage %}<span style="color: #555;"> · {{ med.dosage }}</span>{% endif %}
+          {% if med.frequency %}<span style="color: #555;"> · {{ med.frequency }}</span>{% endif %}
+          {% if med.notes %}
+            <p style="margin-top: 0.3rem; color: #666; font-size: 0.9rem;">{{ med.notes }}</p>
+          {% endif %}
+          <small style="display: block; margin-top: 0.4rem; color: #888;">
+            Prescrito por {{ med.prescribed_by.get_kind_display }} {{ med.prescribed_by.user.get_full_name }}
+            {% if med.started_at %}· desde {{ med.started_at|date:"d/m/Y" }}{% endif %}
+          </small>
+        </div>
+        {% if user.provider_profile.can_prescribe and med.prescribed_by == user.provider_profile %}
+          <div style="display: flex; gap: 0.4rem; flex-shrink: 0;">
+            <a href="{% url 'clinical:medication_edit' med.id %}">Editar</a>
+            <form method="post" action="{% url 'clinical:medication_discontinue' med.id %}" class="inline">
+              {% csrf_token %}
+              <button type="submit" style="background: none; border: none; color: #c0392b; cursor: pointer; padding: 0;">Descontinuar</button>
+            </form>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  {% endfor %}
+{% else %}
+  <p style="color: #666;">Nenhuma medicação prescrita ativa.</p>
+{% endif %}
+
+{% if reported_medication %}
+  <h3 style="margin-top: 1rem;">O que o paciente diz que está tomando</h3>
+  <div class="card" style="border-left: 3px solid #aaa;">
+    <small style="color: #666;">Atualizado em {{ reported_medication.updated_at|date:"d/m/Y H:i" }}</small>
+    <p style="margin-top: 0.4rem; white-space: pre-wrap;">{{ reported_medication.content }}</p>
+  </div>
+{% endif %}
+
+{# ---- Anotações clínicas ---- #}
+<h2 style="margin-top: 2rem;">Anotações clínicas</h2>
+<p>
+  <a href="{% url 'journal:clinical_note_create' patient.id %}"><button>+ Nova anotação</button></a>
+</p>
+{% if not clinical_notes %}
+  <p style="color: #666;">Você ainda não fez anotações sobre este paciente.</p>
+{% endif %}
+{% for note in clinical_notes %}
+  <div class="card">
+    <div style="display: flex; align-items: center; gap: 0.6rem;">
+      <strong>{% if note.session_date %}Sessão {{ note.session_date|date:"d/m/Y" }}{% else %}Anotação{% endif %}</strong>
+      <span class="spacer" style="flex: 1;"></span>
+      <small style="color: #666;">criada {{ note.created_at|date:"d/m/Y H:i" }}</small>
+      <a href="{% url 'journal:clinical_note_edit' note.id %}">Editar</a>
+    </div>
+    <p style="margin-top: 0.6rem; white-space: pre-wrap;">{{ note.content }}</p>
+  </div>
+{% endfor %}
+
+{# ---- Timeline do diário ---- #}
+<h2 style="margin-top: 2rem;">Registros compartilhados pelo paciente</h2>
+
+<h3>Humor (calendário compartilhado)</h3>
+{% if not mood_logs %}
+  <p style="color: #666;">Nenhum registro de humor compartilhado.</p>
+{% endif %}
+{% for log in mood_logs %}
+  <div class="card" style="display: flex; gap: 0.8rem; align-items: center;">
+    <strong>{{ log.get_mood_display }}</strong>
+    <span class="spacer" style="flex: 1;"></span>
+    <small style="color: #666;">{{ log.recorded_at|date:"d/m/Y H:i" }}</small>
+  </div>
+{% endfor %}
+
+<h3 style="margin-top: 1.5rem;">Diário (eventos compartilhados)</h3>
+{% if not journal_entries %}
+  <p style="color: #666;">
+    O paciente ainda não compartilhou nenhuma entrada. Apenas registros que ele
+    explicitamente marcou como compartilhados aparecem aqui.
+  </p>
+{% endif %}
+{% for entry in journal_entries %}
+  <div class="card">
+    <div style="display: flex; align-items: center; gap: 0.6rem;">
+      <strong>{{ entry.get_kind_display }}</strong>
+      {% if entry.title %}<span>· {{ entry.title }}</span>{% endif %}
+      {% if entry.mood %}
+        <span class="status-badge">{{ entry.get_mood_display }}</span>
+      {% endif %}
+      <span class="spacer" style="flex: 1;"></span>
+      <small style="color: #666;">{{ entry.created_at|date:"d/m/Y H:i" }}</small>
+    </div>
+    <p style="margin-top: 0.6rem; white-space: pre-wrap;">{{ entry.content }}</p>
+  </div>
+{% endfor %}
+{% endblock %}

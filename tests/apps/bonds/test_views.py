@@ -8,8 +8,8 @@ from django.urls import reverse
 from apps.bonds.models import Bond, BondStatus
 from tests.factories import (
     BondFactory,
+    HealthcareProviderFactory,
     PatientProfileFactory,
-    PsychologistProfileFactory,
     UserFactory,
 )
 
@@ -23,8 +23,8 @@ def _login(client, user, password="t3st"):
 
 
 class TestAuthRequired:
-    def test_psychologist_dashboard_redirects_to_login(self, client):
-        resp = client.get(reverse("bonds:psychologist_dashboard"))
+    def test_provider_dashboard_redirects_to_login(self, client):
+        resp = client.get(reverse("bonds:provider_dashboard"))
         assert resp.status_code == 302
         assert "/login/" in resp.url
 
@@ -38,56 +38,94 @@ class TestAuthRequired:
 
 
 class TestRoleIsolation:
-    def test_patient_cannot_open_psychologist_dashboard(self, client):
+    def test_patient_cannot_open_provider_dashboard(self, client):
         patient_profile = PatientProfileFactory()
         _login(client, patient_profile.user)
-        resp = client.get(reverse("bonds:psychologist_dashboard"))
+        resp = client.get(reverse("bonds:provider_dashboard"))
         assert resp.status_code == 404
 
-    def test_psychologist_cannot_open_patient_dashboard(self, client):
-        psych_profile = PsychologistProfileFactory()
-        _login(client, psych_profile.user)
+    def test_provider_cannot_open_patient_dashboard(self, client):
+        provider = HealthcareProviderFactory()
+        _login(client, provider.user)
         resp = client.get(reverse("bonds:patient_dashboard"))
         assert resp.status_code == 404
 
-    def test_user_without_profile_lands_on_no_profile(self, client):
+    def test_user_without_profile_redirected_to_onboarding(self, client):
         user = UserFactory()
         _login(client, user)
         resp = client.get(reverse("bonds:home"), follow=True)
         assert resp.status_code == 200
-        assert b"perfil" in resp.content.lower()
+        # Tela de escolha de perfil (accounts:choose_profile)
+        assert b"Sou paciente" in resp.content
+        assert b"Sou profissional" in resp.content
 
 
-class TestPsychologistFlow:
+class TestProviderFlow:
     def test_create_invite(self, client):
-        psych_profile = PsychologistProfileFactory()
-        _login(client, psych_profile.user)
+        provider = HealthcareProviderFactory()
+        _login(client, provider.user)
 
         resp = client.post(reverse("bonds:create_invite"), follow=True)
         assert resp.status_code == 200
 
-        bonds = Bond.objects.for_psychologist(psych_profile)
+        bonds = Bond.objects.for_provider(provider)
         assert bonds.count() == 1
         assert bonds.first().status == BondStatus.INVITED
 
-    def test_psychologist_cannot_confirm_others_bond(self, client):
-        """Fail-closed: psicólogo A tentando confirmar bond do psicólogo B → 404."""
-        psych_a = PsychologistProfileFactory()
-        psych_b = PsychologistProfileFactory()
-        bond_b = BondFactory(pending=True, psychologist=psych_b)
+    def test_create_invite_with_label(self, client):
+        """Profissional pode rotular o convite pra lembrar quem é o destinatário."""
+        provider = HealthcareProviderFactory()
+        _login(client, provider.user)
 
-        _login(client, psych_a.user)
+        resp = client.post(
+            reverse("bonds:create_invite"),
+            {"invitee_label": "João Silva"},
+            follow=True,
+        )
+        assert resp.status_code == 200
+
+        bond = Bond.objects.for_provider(provider).first()
+        assert bond.invitee_label == "João Silva"
+        # Label aparece na mensagem de sucesso e no dashboard
+        assert b"Jo\xc3\xa3o Silva" in resp.content
+
+    def test_create_invite_label_is_optional(self, client):
+        provider = HealthcareProviderFactory()
+        _login(client, provider.user)
+
+        client.post(reverse("bonds:create_invite"), {"invitee_label": ""})
+        bond = Bond.objects.for_provider(provider).first()
+        assert bond is not None
+        assert bond.invitee_label == ""
+
+    def test_dashboard_shows_invitee_label_on_pending_bond(self, client):
+        """Antes do paciente aceitar, o label é o único identificador do convite."""
+        provider = HealthcareProviderFactory()
+        BondFactory(provider=provider, invitee_label="Maria - nova consulta")
+        _login(client, provider.user)
+
+        resp = client.get(reverse("bonds:provider_dashboard"))
+        assert resp.status_code == 200
+        assert b"Maria - nova consulta" in resp.content
+
+    def test_provider_cannot_confirm_others_bond(self, client):
+        """Fail-closed: profissional A tentando confirmar bond do profissional B → 404."""
+        provider_a = HealthcareProviderFactory()
+        provider_b = HealthcareProviderFactory()
+        bond_b = BondFactory(pending=True, provider=provider_b)
+
+        _login(client, provider_a.user)
         resp = client.post(reverse("bonds:confirm_bond", args=[bond_b.id]))
         assert resp.status_code == 404
 
         bond_b.refresh_from_db()
         assert bond_b.status == BondStatus.PENDING_CONFIRMATION  # não mudou
 
-    def test_psychologist_can_confirm_own_pending_bond(self, client):
-        psych = PsychologistProfileFactory()
-        bond = BondFactory(pending=True, psychologist=psych)
+    def test_provider_can_confirm_own_pending_bond(self, client):
+        provider = HealthcareProviderFactory()
+        bond = BondFactory(pending=True, provider=provider)
 
-        _login(client, psych.user)
+        _login(client, provider.user)
         resp = client.post(reverse("bonds:confirm_bond", args=[bond.id]), follow=True)
         assert resp.status_code == 200
 
@@ -97,8 +135,8 @@ class TestPsychologistFlow:
 
 class TestPatientFlow:
     def test_patient_enters_invite_code(self, client):
-        psych = PsychologistProfileFactory()
-        bond = BondFactory(psychologist=psych)
+        provider = HealthcareProviderFactory()
+        bond = BondFactory(provider=provider)
         patient = PatientProfileFactory()
 
         _login(client, patient.user)
@@ -117,8 +155,8 @@ class TestPatientFlow:
         patient = PatientProfileFactory()
         BondFactory(active=True, patient=patient)
 
-        new_psych = PsychologistProfileFactory()
-        new_bond = BondFactory(psychologist=new_psych)
+        new_provider = HealthcareProviderFactory()
+        new_bond = BondFactory(provider=new_provider)
 
         _login(client, patient.user)
         resp = client.post(
@@ -143,9 +181,9 @@ class TestPatientFlow:
     def test_dual_user_cannot_accept_own_invite(self, client):
         """User com ambos perfis não pode usar próprio código."""
         user = UserFactory()
-        psych = PsychologistProfileFactory(user=user)
+        provider = HealthcareProviderFactory(user=user)
         PatientProfileFactory(user=user)
-        own_bond = BondFactory(psychologist=psych)
+        own_bond = BondFactory(provider=provider)
 
         _login(client, user)
         resp = client.post(
@@ -163,9 +201,9 @@ class TestPatientFlow:
 
 class TestEndBond:
     def test_either_side_can_end_their_bond(self, client):
-        psych = PsychologistProfileFactory()
+        provider = HealthcareProviderFactory()
         patient = PatientProfileFactory()
-        bond = BondFactory(active=True, psychologist=psych, patient=patient)
+        bond = BondFactory(active=True, provider=provider, patient=patient)
 
         _login(client, patient.user)
         resp = client.post(reverse("bonds:end_bond", args=[bond.id]), follow=True)

@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Consulta — {{ patient.user.get_full_name }} — MoodTrack{% endblock %}
+
+{% block content %}
+<p><a href="{% url 'journal:provider_patient_detail' patient.id %}">← Voltar para a timeline</a></p>
+
+<h1>Consulta — {{ patient.user.get_full_name }}</h1>
+<p style="color: #666;">
+  {{ user.provider_profile.get_kind_display }} ·
+  {{ patient.user.email }} ·
+  vínculo desde {{ bond.provider_confirmed_at|date:"d/m/Y" }}
+</p>
+
+<div style="display: grid; grid-template-columns: 1fr 320px; gap: 1.5rem; margin-top: 1.5rem;">
+
+  {# ===== Coluna principal: escrita da sessão ===== #}
+  <section>
+    <h2>Anotação desta sessão</h2>
+    <form method="post">
+      {% csrf_token %}
+      {% for field in form %}
+        <p>
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label><br>
+          {{ field }}
+          {% if field.errors %}
+            <ul class="messages">
+              {% for err in field.errors %}<li class="error">{{ err }}</li>{% endfor %}
+            </ul>
+          {% endif %}
+        </p>
+      {% endfor %}
+      <button type="submit">Salvar anotação</button>
+    </form>
+
+    {% if recent_notes %}
+      <h2 style="margin-top: 2rem;">Sessões anteriores</h2>
+      {% for note in recent_notes %}
+        <div class="card">
+          <div style="display: flex; align-items: center; gap: 0.6rem;">
+            <strong>
+              {% if note.session_date %}Sessão {{ note.session_date|date:"d/m/Y" }}{% else %}Anotação{% endif %}
+            </strong>
+            <span class="spacer" style="flex: 1;"></span>
+            <small style="color: #666;">criada {{ note.created_at|date:"d/m/Y H:i" }}</small>
+            <a href="{% url 'journal:clinical_note_edit' note.id %}">Editar</a>
+          </div>
+          <p style="margin-top: 0.6rem; white-space: pre-wrap;">{{ note.content }}</p>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p style="color: #666; margin-top: 2rem;">Primeira sessão — sem anotações anteriores.</p>
+    {% endif %}
+  </section>
+
+  {# ===== Sidebar: contexto rápido ===== #}
+  <aside style="background: #fafafa; padding: 1rem; border-radius: 6px; border: 1px solid #eee; align-self: start;">
+    <h3 style="margin-top: 0;">Medicações ativas</h3>
+    {% if medications %}
+      {% for med in medications %}
+        <div style="margin-bottom: 0.8rem; padding-bottom: 0.8rem; border-bottom: 1px solid #eee;">
+          <strong>{{ med.name }}</strong>
+          {% if med.dosage %}<div style="color: #555; font-size: 0.9rem;">{{ med.dosage }}</div>{% endif %}
+          {% if med.frequency %}<div style="color: #555; font-size: 0.9rem;">{{ med.frequency }}</div>{% endif %}
+          <small style="color: #888;">
+            por {{ med.prescribed_by.user.get_full_name }}
+          </small>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p style="color: #888; font-size: 0.9rem;">Nenhuma medicação ativa.</p>
+    {% endif %}
+
+    {% if user.provider_profile.can_prescribe %}
+      <p style="margin-top: 0.6rem;">
+        <a href="{% url 'clinical:medication_create' patient.id %}">+ Prescrever</a>
+      </p>
+    {% endif %}
+
+    <h3 style="margin-top: 1.2rem;">Auto-reporte do paciente</h3>
+    {% if reported_medication %}
+      <p style="font-size: 0.9rem; color: #555; white-space: pre-wrap;">{{ reported_medication.content }}</p>
+      <small style="color: #888;">atualizado {{ reported_medication.updated_at|date:"d/m/Y" }}</small>
+    {% else %}
+      <p style="color: #888; font-size: 0.9rem;">Paciente ainda não registrou.</p>
+    {% endif %}
+  </aside>
+
+</div>
+{% endblock %}

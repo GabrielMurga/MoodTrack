@@ -8,13 +8,14 @@ Três entidades, três audiências, três regras de visibilidade:
 - **JournalEntry** (paciente): acontecimento, pensamento, sonho, reflexão.
   Texto criptografado. Humor opcional (FK / null). Default privado.
 
-- **ClinicalNote** (psicólogo): anotação clínica sobre o paciente.
-  Sempre criptografada. **Visibilidade unilateral**: só o psicólogo dono
-  enxerga. Paciente nunca vê. Padrão clínico real.
+- **ClinicalNote** (profissional): anotação clínica sobre o paciente, escrita
+  pelo psicólogo ou psiquiatra vinculado. Sempre criptografada. **Visibilidade
+  unilateral**: só o profissional dono enxerga. Paciente nunca vê. Padrão
+  clínico real.
 
 CLAUDE.md regras críticas que se aplicam:
 - Regra 2: content sempre criptografado em nível de aplicação.
-- Regra 3: cada registro tem flag `is_shared_with_psychologist` (default False)
+- Regra 3: cada registro tem flag `is_shared_with_provider` (default False)
   exceto ClinicalNote, que tem regra de visibilidade própria.
 - Regras 6/7: querysets filtram por dono antes da view tocar.
 """
@@ -28,7 +29,7 @@ from django.utils.translation import gettext_lazy as _
 from django_cryptography.fields import encrypt
 
 if TYPE_CHECKING:
-    from apps.accounts.models import PatientProfile, PsychologistProfile
+    from apps.accounts.models import HealthcareProvider, PatientProfile
     from apps.bonds.models import Bond
 
 
@@ -51,18 +52,16 @@ class MoodLogQuerySet(models.QuerySet):
     def for_patient(self, profile: PatientProfile) -> MoodLogQuerySet:
         return self.filter(patient=profile)
 
-    def shared_with_psychologist(
-        self, psychologist: PsychologistProfile
-    ) -> MoodLogQuerySet:
+    def shared_with_provider(self, provider: HealthcareProvider) -> MoodLogQuerySet:
         from apps.bonds.models import Bond, BondStatus
 
         bonded_patient_ids = Bond.objects.filter(
-            psychologist=psychologist,
+            provider=provider,
             status=BondStatus.ACTIVE,
         ).values_list("patient_id", flat=True)
         return self.filter(
             patient_id__in=bonded_patient_ids,
-            is_shared_with_psychologist=True,
+            is_shared_with_provider=True,
         )
 
 
@@ -74,8 +73,8 @@ class MoodLog(models.Model):
         verbose_name=_("paciente"),
     )
     mood = models.IntegerField(_("humor"), choices=MoodLevel.choices)
-    is_shared_with_psychologist = models.BooleanField(
-        _("compartilhar com psicólogo"),
+    is_shared_with_provider = models.BooleanField(
+        _("compartilhar com profissional"),
         default=False,
     )
     recorded_at = models.DateTimeField(_("registrado em"), auto_now_add=True, db_index=True)
@@ -110,18 +109,16 @@ class JournalEntryQuerySet(models.QuerySet):
     def for_patient(self, profile: PatientProfile) -> JournalEntryQuerySet:
         return self.filter(patient=profile)
 
-    def shared_with_psychologist(
-        self, psychologist: PsychologistProfile
-    ) -> JournalEntryQuerySet:
+    def shared_with_provider(self, provider: HealthcareProvider) -> JournalEntryQuerySet:
         from apps.bonds.models import Bond, BondStatus
 
         bonded_patient_ids = Bond.objects.filter(
-            psychologist=psychologist,
+            provider=provider,
             status=BondStatus.ACTIVE,
         ).values_list("patient_id", flat=True)
         return self.filter(
             patient_id__in=bonded_patient_ids,
-            is_shared_with_psychologist=True,
+            is_shared_with_provider=True,
         )
 
 
@@ -155,8 +152,8 @@ class JournalEntry(models.Model):
         blank=True,
     )
 
-    is_shared_with_psychologist = models.BooleanField(
-        _("compartilhar com psicólogo"),
+    is_shared_with_provider = models.BooleanField(
+        _("compartilhar com profissional"),
         default=False,
     )
 
@@ -185,15 +182,13 @@ class JournalEntry(models.Model):
 
 
 class ClinicalNoteQuerySet(models.QuerySet):
-    def for_psychologist(
-        self, psychologist: PsychologistProfile
-    ) -> ClinicalNoteQuerySet:
-        """Notas escritas POR este psicólogo. Visibilidade unilateral.
+    def for_provider(self, provider: HealthcareProvider) -> ClinicalNoteQuerySet:
+        """Notas escritas POR este profissional. Visibilidade unilateral.
 
-        ClinicalNote é privada do psicólogo: o paciente nunca vê.
-        Outros psicólogos nunca veem (mesmo que houvesse vínculo histórico).
+        ClinicalNote é privada do profissional: o paciente nunca vê.
+        Outros profissionais nunca veem (mesmo que houvesse vínculo histórico).
         """
-        return self.filter(bond__psychologist=psychologist)
+        return self.filter(bond__provider=provider)
 
     def for_bond(self, bond: Bond) -> ClinicalNoteQuerySet:
         return self.filter(bond=bond)
@@ -205,7 +200,7 @@ class ClinicalNote(models.Model):
         on_delete=models.PROTECT,
         related_name="clinical_notes",
         verbose_name=_("vínculo"),
-        help_text=_("Define implicitamente o psicólogo (autor) e o paciente (sujeito)."),
+        help_text=_("Define implicitamente o profissional (autor) e o paciente (sujeito)."),
     )
     content = encrypt(models.TextField(_("conteúdo")))
     session_date = models.DateField(

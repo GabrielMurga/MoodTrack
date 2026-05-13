@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Perfil de paciente — MoodTrack{% endblock %}
+
+{% block content %}
+<p><a href="{% url 'accounts:choose_profile' %}">← Voltar</a></p>
+
+<h1>Perfil de paciente</h1>
+
+<form method="post">
+  {% csrf_token %}
+
+  <p>
+    <label for="{{ form.preferred_name.id_for_label }}">{{ form.preferred_name.label }}</label><br>
+    {{ form.preferred_name }}
+    {% if form.preferred_name.errors %}
+      <ul class="messages">{% for e in form.preferred_name.errors %}<li class="error">{{ e }}</li>{% endfor %}</ul>
+    {% endif %}
+  </p>
+
+  <p>
+    <label for="{{ form.birth_date.id_for_label }}">{{ form.birth_date.label }}</label><br>
+    {{ form.birth_date }}
+  </p>
+
+  <button type="submit">Criar perfil</button>
+</form>
+{% endblock %}

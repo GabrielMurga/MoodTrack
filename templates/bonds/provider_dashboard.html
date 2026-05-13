@@ -1,12 +1,26 @@
 {% extends "base.html" %}
-{% block title %}Painel do psicólogo — MoodTrack{% endblock %}
+{% block title %}Painel do profissional — MoodTrack{% endblock %}
 
 {% block content %}
 <h1>Vínculos</h1>
 
 <form method="post" action="{% url 'bonds:create_invite' %}" style="margin-bottom: 1.5rem;">
   {% csrf_token %}
-  <button type="submit">+ Gerar novo convite</button>
+  <p style="margin-bottom: 0.4rem;">
+    <label for="{{ invite_form.invitee_label.id_for_label }}">
+      {{ invite_form.invitee_label.label }}
+    </label><br>
+    {{ invite_form.invitee_label }}
+    <small style="display: block; color: #666; margin-top: 0.2rem;">
+      Opcional. Só você vê — serve pra você lembrar quem é o destinatário do código.
+    </small>
+    {% if invite_form.invitee_label.errors %}
+      <ul class="messages">
+        {% for err in invite_form.invitee_label.errors %}<li class="error">{{ err }}</li>{% endfor %}
+      </ul>
+    {% endif %}
+  </p>
+  <button type="submit">+ Gerar convite</button>
 </form>
 
 {% if not bonds %}
@@ -20,6 +34,12 @@
       <span class="status-badge status-{{ bond.status }}">{{ bond.get_status_display }}</span>
     </div>
 
+    {% if bond.invitee_label %}
+      <div style="margin-top: 0.4rem; color: #555; font-size: 0.9rem;">
+        <strong>Para:</strong> {{ bond.invitee_label }}
+      </div>
+    {% endif %}
+
     <div style="margin-top: 0.6rem; color: #444;">
       {% if bond.patient %}
         <strong>Paciente:</strong> {{ bond.patient.user.email }}
@@ -30,8 +50,8 @@
 
     <div style="margin-top: 0.6rem; font-size: 0.85rem; color: #666;">
       Convite criado em {{ bond.invited_at|date:"d/m/Y H:i" }}
-      {% if bond.psychologist_confirmed_at %}
-        · Confirmado em {{ bond.psychologist_confirmed_at|date:"d/m/Y H:i" }}
+      {% if bond.provider_confirmed_at %}
+        · Confirmado em {{ bond.provider_confirmed_at|date:"d/m/Y H:i" }}
       {% endif %}
       {% if bond.ended_at %}
         · Encerrado em {{ bond.ended_at|date:"d/m/Y H:i" }}

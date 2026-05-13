@@ -14,8 +14,8 @@ from apps.bonds.models import (
 )
 from tests.factories import (
     BondFactory,
+    HealthcareProviderFactory,
     PatientProfileFactory,
-    PsychologistProfileFactory,
     UserFactory,
 )
 
@@ -66,7 +66,7 @@ class TestStateTransitions:
         bond = BondFactory(pending=True)
         bond.confirm()
         assert bond.status == BondStatus.ACTIVE
-        assert bond.psychologist_confirmed_at is not None
+        assert bond.provider_confirmed_at is not None
 
     def test_confirm_from_invited_fails(self):
         bond = BondFactory()
@@ -88,12 +88,12 @@ class TestStateTransitions:
             bond.end(by_user=UserFactory())
 
     def test_cannot_accept_own_invite_as_dual_user(self):
-        """User dual (psicóloga + paciente) não pode usar próprio código de convite."""
+        """User dual (profissional + paciente) não pode usar próprio código de convite."""
         user = UserFactory()
-        psych_profile = PsychologistProfileFactory(user=user)
+        provider_profile = HealthcareProviderFactory(user=user)
         patient_profile = PatientProfileFactory(user=user)
 
-        bond = BondFactory(psychologist=psych_profile)
+        bond = BondFactory(provider=provider_profile)
         with pytest.raises(InvalidBondTransition, match="próprio código"):
             bond.accept_invite(patient_profile)
 
@@ -104,38 +104,32 @@ class TestStateTransitions:
 
 class TestUniqueAliveBondConstraint:
     def test_cannot_have_two_alive_bonds_for_same_pair(self):
-        psych = PsychologistProfileFactory()
+        provider = HealthcareProviderFactory()
         patient = PatientProfileFactory()
-        Bond.objects.create(
-            psychologist=psych, patient=patient, status=BondStatus.ACTIVE
-        )
+        Bond.objects.create(provider=provider, patient=patient, status=BondStatus.ACTIVE)
         with pytest.raises(IntegrityError):
             Bond.objects.create(
-                psychologist=psych, patient=patient, status=BondStatus.PENDING_CONFIRMATION
+                provider=provider, patient=patient, status=BondStatus.PENDING_CONFIRMATION
             )
 
     def test_can_have_ended_bond_plus_new_alive_bond(self):
-        psych = PsychologistProfileFactory()
+        provider = HealthcareProviderFactory()
         patient = PatientProfileFactory()
-        Bond.objects.create(
-            psychologist=psych, patient=patient, status=BondStatus.ENDED
-        )
+        Bond.objects.create(provider=provider, patient=patient, status=BondStatus.ENDED)
         # Não deve falhar — ENDED não conta para a constraint.
-        Bond.objects.create(
-            psychologist=psych, patient=patient, status=BondStatus.ACTIVE
-        )
+        Bond.objects.create(provider=provider, patient=patient, status=BondStatus.ACTIVE)
 
 
 class TestQuerysetIsolation:
-    def test_for_psychologist_filters_to_owner(self):
-        psych_a = PsychologistProfileFactory()
-        psych_b = PsychologistProfileFactory()
-        BondFactory(psychologist=psych_a)
-        BondFactory(psychologist=psych_b)
+    def test_for_provider_filters_to_owner(self):
+        provider_a = HealthcareProviderFactory()
+        provider_b = HealthcareProviderFactory()
+        BondFactory(provider=provider_a)
+        BondFactory(provider=provider_b)
 
-        bonds_a = Bond.objects.for_psychologist(psych_a)
+        bonds_a = Bond.objects.for_provider(provider_a)
         assert bonds_a.count() == 1
-        assert bonds_a.first().psychologist == psych_a
+        assert bonds_a.first().provider == provider_a
 
     def test_for_user_returns_empty_for_user_without_profile(self):
         """Fail-closed: user sem perfil vê queryset vazio, não erro."""
@@ -144,14 +138,14 @@ class TestQuerysetIsolation:
         assert Bond.objects.for_user(user).count() == 0
 
     def test_for_user_returns_bonds_from_both_profiles(self):
-        """User dual (psicóloga + paciente) vê bonds dos dois lados."""
+        """User dual (profissional + paciente) vê bonds dos dois lados."""
         user = UserFactory()
-        psych_profile = PsychologistProfileFactory(user=user)
+        provider_profile = HealthcareProviderFactory(user=user)
         patient_profile = PatientProfileFactory(user=user)
 
-        BondFactory(psychologist=psych_profile)  # como psicóloga
+        BondFactory(provider=provider_profile)  # como profissional
         BondFactory(active=True, patient=patient_profile)  # como paciente
-        BondFactory()  # de outro psicólogo, não deve aparecer
+        BondFactory()  # de outro profissional, não deve aparecer
 
         user.refresh_from_db()
         assert Bond.objects.for_user(user).count() == 2

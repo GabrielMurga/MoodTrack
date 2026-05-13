@@ -6,7 +6,7 @@ app_name = "bonds"
 
 urlpatterns = [
     path("", views.home, name="home"),
-    path("psicologo/", views.psychologist_dashboard, name="psychologist_dashboard"),
+    path("profissional/", views.provider_dashboard, name="provider_dashboard"),
     path("paciente/", views.patient_dashboard, name="patient_dashboard"),
     path("invite/", views.create_invite, name="create_invite"),
     path("enter/", views.enter_invite, name="enter_invite"),

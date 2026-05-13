@@ -2,11 +2,11 @@
 {% block title %}Briefings — {{ bond.patient.user.email }}{% endblock %}
 
 {% block content %}
-<p><a href="{% url 'journal:psychologist_patient_detail' bond.patient.id %}">← Voltar para paciente</a></p>
+<p><a href="{% url 'journal:provider_patient_detail' bond.patient.id %}">← Voltar para paciente</a></p>
 
 <h1>Briefings — {{ bond.patient.user.get_full_name }}</h1>
 
-<form method="post" action="{% url 'ai:psychologist_generate_briefing' bond.patient.id %}" style="margin: 1.5rem 0;">
+<form method="post" action="{% url 'ai:provider_generate_briefing' bond.patient.id %}" style="margin: 1.5rem 0;">
   {% csrf_token %}
   <button type="submit">Gerar briefing pré-sessão</button>
 </form>

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Perfil de profissional — MoodTrack{% endblock %}
+
+{% block content %}
+<p><a href="{% url 'accounts:choose_profile' %}">← Voltar</a></p>
+
+<h1>Perfil de profissional</h1>
+
+<form method="post">
+  {% csrf_token %}
+
+  <fieldset style="border: 1px solid #ddd; border-radius: 6px; padding: 0.8rem 1rem; margin-bottom: 1rem;">
+    <legend>{{ form.kind.label }}</legend>
+    {{ form.kind }}
+    {% if form.kind.errors %}
+      <ul class="messages">{% for e in form.kind.errors %}<li class="error">{{ e }}</li>{% endfor %}</ul>
+    {% endif %}
+  </fieldset>
+
+  <p>
+    <label for="{{ form.crp_number.id_for_label }}">{{ form.crp_number.label }}</label><br>
+    {{ form.crp_number }}
+    {% if form.crp_number.errors %}
+      <ul class="messages">{% for e in form.crp_number.errors %}<li class="error">{{ e }}</li>{% endfor %}</ul>
+    {% endif %}
+  </p>
+
+  <p>
+    <label for="{{ form.crm_number.id_for_label }}">{{ form.crm_number.label }}</label><br>
+    {{ form.crm_number }}
+    {% if form.crm_number.errors %}
+      <ul class="messages">{% for e in form.crm_number.errors %}<li class="error">{{ e }}</li>{% endfor %}</ul>
+    {% endif %}
+  </p>
+
+  <p>
+    <label for="{{ form.bio.id_for_label }}">{{ form.bio.label }}</label><br>
+    {{ form.bio }}
+  </p>
+
+  <button type="submit">Criar perfil</button>
+</form>
+
+<p style="margin-top: 1.5rem; color: #888; font-size: 0.85rem;">
+  Você começa no plano Básico (sem IA). Para habilitar geração de briefings e
+  resumos automatizados, faça upgrade depois pelas configurações.
+</p>
+{% endblock %}

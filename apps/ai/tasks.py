@@ -13,8 +13,9 @@ Sync por enquanto (ADR 0008). Cada função:
 Audiência:
 - `generate_weekly_summary(patient_profile, actor)` — paciente vê
   TODOS os próprios dados (privados + compartilhados).
-- `generate_session_briefing(bond, actor)` — psicólogo vê só dados
-  shared do paciente + suas próprias notas clínicas.
+- `generate_session_briefing(bond, actor)` — profissional (psicólogo
+  ou psiquiatra) vê só dados shared do paciente + suas próprias notas
+  clínicas.
 """
 
 from __future__ import annotations
@@ -37,9 +38,19 @@ from .pseudonymization import Pseudonymizer, pseudonymizer
 # ---------------------------------------------------------------------------
 
 
-def _format_mood_logs(qs) -> str:
+_COMPACT_MAX_ENTRIES = 10
+_COMPACT_MAX_CHARS = 500
+
+
+def _truncate(text: str, max_chars: int) -> str:
+    return text[:max_chars] + "…" if len(text) > max_chars else text
+
+
+def _format_mood_logs(qs, compact: bool = False) -> str:
     if not qs.exists():
         return "Sem registros de humor no período."
+    if compact:
+        qs = qs[:14]
     lines = []
     for log in qs:
         emoji = MoodLevel(log.mood).label
@@ -47,17 +58,18 @@ def _format_mood_logs(qs) -> str:
     return "\n".join(lines)
 
 
-def _format_journal_entries(qs) -> str:
+def _format_journal_entries(qs, compact: bool = False) -> str:
     if not qs.exists():
         return "Sem entradas de diário no período."
+    if compact:
+        qs = qs[:_COMPACT_MAX_ENTRIES]
     lines = []
     for entry in qs:
         kind = entry.get_kind_display()
         mood = entry.get_mood_display() if entry.mood else "sem humor"
         title = f' — "{entry.title}"' if entry.title else ""
-        lines.append(
-            f"- [{entry.created_at:%d/%m}] {kind}{title} ({mood}):\n  {entry.content}"
-        )
+        content = _truncate(entry.content, _COMPACT_MAX_CHARS) if compact else entry.content
+        lines.append(f"- [{entry.created_at:%d/%m}] {kind}{title} ({mood}):\n  {content}")
     return "\n\n".join(lines)
 
 
@@ -86,6 +98,8 @@ def generate_weekly_summary(
     actor,
     client: AnthropicClient | None = None,
     pseudo: Pseudonymizer | None = None,
+    model: str | None = None,
+    compact: bool = False,
 ) -> AISummary:
     """Resumo semanal pro paciente (autoconhecimento).
 
@@ -107,8 +121,8 @@ def generate_weekly_summary(
 
     raw_content = (
         "Janela: últimos 7 dias.\n\n"
-        f"REGISTROS DE HUMOR:\n{_format_mood_logs(mood_logs)}\n\n"
-        f"ENTRADAS DO DIÁRIO:\n{_format_journal_entries(journal_entries)}"
+        f"REGISTROS DE HUMOR:\n{_format_mood_logs(mood_logs, compact=compact)}\n\n"
+        f"ENTRADAS DO DIÁRIO:\n{_format_journal_entries(journal_entries, compact=compact)}"
     )
 
     pseudonimized, vault = pseudo.forward(raw_content)
@@ -125,6 +139,7 @@ def generate_weekly_summary(
         system=WEEKLY_SUMMARY_SYSTEM,
         user_message=pseudonimized,
         max_tokens=1500,
+        model=model,
     )
 
     final_text = vault.reverse(result.text)
@@ -157,38 +172,38 @@ def generate_session_briefing(
     actor,
     client: AnthropicClient | None = None,
     pseudo: Pseudonymizer | None = None,
+    model: str | None = None,
+    compact: bool = False,
 ) -> AISummary:
-    """Briefing pré-sessão pro psicólogo.
+    """Briefing pré-sessão pro profissional.
 
     Janela: desde o último briefing gerado, ou desde
-    `psychologist_confirmed_at` se for o primeiro.
+    `provider_confirmed_at` se for o primeiro.
 
     Vê: registros do paciente shared + anotações clínicas próprias do
-    psicólogo. NÃO vê registros privados do paciente (regra 3).
+    profissional. NÃO vê registros privados do paciente (regra 3).
     """
     client = client or default_client
     pseudo = pseudo or pseudonymizer
 
     period_end = timezone.now()
 
-    # Janela: desde último briefing OU desde psicólogo confirmou bond.
+    # Janela: desde último briefing OU desde profissional confirmou bond.
     last = AISummary.objects.for_bond(bond).order_by("-generated_at").first()
-    period_start = (
-        last.generated_at if last is not None else bond.psychologist_confirmed_at
-    )
+    period_start = last.generated_at if last is not None else bond.provider_confirmed_at
     if period_start is None:
         # Bond ainda não confirmado, não deveria chegar aqui — mas fail-safe.
         period_start = period_end - timedelta(days=7)
 
-    psychologist = bond.psychologist
+    provider = bond.provider
     patient = bond.patient
 
-    mood_logs = MoodLog.objects.shared_with_psychologist(psychologist).filter(
+    mood_logs = MoodLog.objects.shared_with_provider(provider).filter(
         patient=patient,
         recorded_at__gte=period_start,
         recorded_at__lte=period_end,
     )
-    journal_entries = JournalEntry.objects.shared_with_psychologist(psychologist).filter(
+    journal_entries = JournalEntry.objects.shared_with_provider(provider).filter(
         patient=patient,
         created_at__gte=period_start,
         created_at__lte=period_end,
@@ -199,8 +214,8 @@ def generate_session_briefing(
 
     raw_content = (
         f"Janela: {period_start:%d/%m} até {period_end:%d/%m}.\n\n"
-        f"REGISTROS DE HUMOR COMPARTILHADOS:\n{_format_mood_logs(mood_logs)}\n\n"
-        f"ENTRADAS DO DIÁRIO COMPARTILHADAS:\n{_format_journal_entries(journal_entries)}\n\n"
+        f"REGISTROS DE HUMOR COMPARTILHADOS:\n{_format_mood_logs(mood_logs, compact=compact)}\n\n"
+        f"ENTRADAS DO DIÁRIO COMPARTILHADAS:\n{_format_journal_entries(journal_entries, compact=compact)}\n\n"
         f"SUAS ANOTAÇÕES CLÍNICAS NO PERÍODO:\n{_format_clinical_notes(clinical_notes)}"
     )
 
@@ -218,6 +233,7 @@ def generate_session_briefing(
         system=SESSION_BRIEFING_SYSTEM,
         user_message=pseudonimized,
         max_tokens=2000,
+        model=model,
     )
 
     final_text = vault.reverse(result.text)

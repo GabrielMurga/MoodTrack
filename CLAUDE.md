@@ -34,8 +34,8 @@ Estas regras valem em **toda** decisão de código. Quando houver conflito entre
 
 1. **Nenhum dado de paciente vai para LLM externa sem passar pelo pipeline de pseudonimização** (`apps/ai/pseudonymization.py`). Sem exceção. Mesmo em testes, mesmo em prototipagem, mesmo "só pra ver se funciona".
 2. **Campos sensíveis são criptografados em nível de aplicação** com django-cryptography ou django-fernet-fields: anotações de paciente, transcrições, anotações clínicas do psicólogo, conteúdo de registros. Chaves gerenciadas separadamente do banco.
-3. **Cada registro do paciente carrega flag explícita de visibilidade** (`is_shared_with_psychologist: bool`). Default é `False` (privado). Compartilhamento é decisão consciente do paciente, nunca implícita.
-4. **Vínculo paciente-psicólogo exige confirmação dos dois lados.** Código de convite gerado pelo psicólogo, inserido pelo paciente, confirmado pelo psicólogo. Não há vínculo automático.
+3. **Cada registro do paciente carrega flag explícita de visibilidade** (`is_shared_with_provider: bool`). Default é `False` (privado). Compartilhamento é decisão consciente do paciente, nunca implícita.
+4. **Vínculo paciente-profissional exige confirmação dos dois lados.** Código de convite gerado pelo profissional (psicólogo ou psiquiatra — ADR 0009), inserido pelo paciente, confirmado pelo profissional. Não há vínculo automático.
 
 ### Autorização
 

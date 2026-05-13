@@ -20,7 +20,7 @@
     <small style="color: #666;">{{ log.recorded_at|date:"d/m/Y H:i" }}</small>
     <form method="post" action="{% url 'journal:patient_mood_toggle_share' log.id %}" class="inline">
       {% csrf_token %}
-      {% if log.is_shared_with_psychologist %}
+      {% if log.is_shared_with_provider %}
         <button type="submit" title="Tornar privado">Compartilhado ✓</button>
       {% else %}
         <button type="submit" title="Compartilhar">Privado</button>

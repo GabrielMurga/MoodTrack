@@ -47,7 +47,9 @@ class AuditLog(models.Model):
         _("tipo do alvo"),
         max_length=64,
         blank=True,
-        help_text=_("Nome do modelo do alvo (ex.: 'Bond', 'MoodEntry'). Vazio se ação não tem alvo."),
+        help_text=_(
+            "Nome do modelo do alvo (ex.: 'Bond', 'MoodEntry'). Vazio se ação não tem alvo."
+        ),
     )
     target_id = models.BigIntegerField(
         _("ID do alvo"),
@@ -69,18 +71,12 @@ class AuditLog(models.Model):
 
     def __str__(self) -> str:
         actor = self.actor.email if self.actor_id else "system"
-        target = (
-            f"{self.target_type}#{self.target_id}"
-            if self.target_type
-            else "(sem alvo)"
-        )
+        target = f"{self.target_type}#{self.target_id}" if self.target_type else "(sem alvo)"
         return f"[{self.timestamp:%Y-%m-%d %H:%M}] {actor} → {self.action} {target}"
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         if self.pk is not None:
-            raise AuditLogError(
-                "AuditLog é append-only — UPDATE não permitido."
-            )
+            raise AuditLogError("AuditLog é append-only — UPDATE não permitido.")
         super().save(*args, **kwargs)
 
     def delete(self, *args: Any, **kwargs: Any) -> None:

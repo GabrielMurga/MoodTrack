@@ -8,10 +8,12 @@
   Material de reflexão — não é diagnóstico nem conselho clínico.
 </p>
 
-<form method="post" action="{% url 'ai:patient_generate_weekly' %}" style="margin: 1.5rem 0;">
-  {% csrf_token %}
-  <button type="submit">Gerar resumo da semana</button>
-</form>
+{% if user.patient_profile.has_ai_via_bond %}
+  <form method="post" action="{% url 'ai:patient_generate_weekly' %}" style="margin: 1.5rem 0;">
+    {% csrf_token %}
+    <button type="submit">Gerar resumo da semana</button>
+  </form>
+{% endif %}
 
 {% if not summaries %}
   <p>Nenhum resumo ainda. Quanto mais registros você tiver, mais útil fica.</p>

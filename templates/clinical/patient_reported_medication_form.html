@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Minhas medicações — MoodTrack{% endblock %}
+
+{% block content %}
+<p><a href="{% url 'bonds:patient_dashboard' %}">← Voltar</a></p>
+
+<h1>Minhas medicações</h1>
+<p style="color: #666;">
+  Liste o que você está tomando — remédios prescritos, OTC, suplementos.
+  Seu profissional de saúde usa isso como contexto clínico.
+</p>
+
+<form method="post" style="max-width: 520px; margin-top: 1rem;">
+  {% csrf_token %}
+  {% for field in form %}
+    <p>
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label><br>
+      {{ field }}
+      {% if field.errors %}
+        <ul class="messages">
+          {% for err in field.errors %}<li class="error">{{ err }}</li>{% endfor %}
+        </ul>
+      {% endif %}
+    </p>
+  {% endfor %}
+  <button type="submit">Salvar</button>
+</form>
+
+{% if reports %}
+  <h2 style="margin-top: 2rem;">Histórico de registros</h2>
+  {% for report in reports %}
+    <div class="card">
+      <small style="color: #666;">{{ report.updated_at|date:"d/m/Y H:i" }}</small>
+      <p style="margin-top: 0.4rem; white-space: pre-wrap;">{{ report.content }}</p>
+    </div>
+  {% endfor %}
+{% endif %}
+{% endblock %}

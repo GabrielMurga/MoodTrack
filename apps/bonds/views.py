@@ -1,7 +1,7 @@
 """Views do app bonds.
 
 Cada view aplica fail-closed (CLAUDE.md regra 5): permissão derivada do
-perfil do usuário, queryset filtrado pelo manager `for_user/for_psychologist
+perfil do usuário, queryset filtrado pelo manager `for_user/for_provider
 /for_patient` antes de qualquer lógica. Tentativa de operar em Bond fora
 do escopo do perfil retorna 404 (não 403, para não vazar existência).
 """
@@ -14,17 +14,20 @@ from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from .forms import EnterInviteCodeForm
+from apps.clinical.models import Medication, PatientReportedMedication
+
+from .forms import CreateInviteForm, EnterInviteCodeForm
 from .models import Bond, BondStatus, InvalidBondTransition
 
 # ---------- helpers ----------
 
-def _require_psychologist(request: HttpRequest):
-    if not request.user.is_psychologist:
+
+def _require_provider(request: HttpRequest):
+    if not request.user.is_provider:
         from django.http import Http404
 
-        raise Http404("Perfil de psicólogo não encontrado.")
-    return request.user.psychologist_profile
+        raise Http404("Perfil de profissional não encontrado.")
+    return request.user.provider_profile
 
 
 def _require_patient(request: HttpRequest):
@@ -37,52 +40,71 @@ def _require_patient(request: HttpRequest):
 
 # ---------- home/router ----------
 
+
 @login_required
 def home(request: HttpRequest) -> HttpResponse:
     """Roteia o usuário para o dashboard adequado.
 
-    Se tem ambos perfis, default para psicólogo (decisão arbitrária; troca
-    explícita pela nav).
+    Se tem ambos perfis, default para profissional (decisão arbitrária; troca
+    explícita pela nav). Se não tem nenhum, manda pro onboarding.
     """
     user = request.user
-    if user.is_psychologist:
-        return redirect("bonds:psychologist_dashboard")
+    if user.is_provider:
+        return redirect("bonds:provider_dashboard")
     if user.is_patient:
         return redirect("bonds:patient_dashboard")
-    return render(request, "bonds/no_profile.html", status=200)
+    return redirect("accounts:choose_profile")
 
 
-# ---------- psicólogo ----------
+# ---------- profissional ----------
+
 
 @login_required
-def psychologist_dashboard(request: HttpRequest) -> HttpResponse:
-    profile = _require_psychologist(request)
-    bonds = Bond.objects.for_psychologist(profile).order_by("-invited_at")
+def provider_dashboard(request: HttpRequest) -> HttpResponse:
+    profile = _require_provider(request)
+    bonds = Bond.objects.for_provider(profile).order_by("-invited_at")
     return render(
         request,
-        "bonds/psychologist_dashboard.html",
-        {"bonds": bonds, "BondStatus": BondStatus},
+        "bonds/provider_dashboard.html",
+        {
+            "bonds": bonds,
+            "BondStatus": BondStatus,
+            "invite_form": CreateInviteForm(),
+        },
     )
 
 
 @login_required
 @require_POST
 def create_invite(request: HttpRequest) -> HttpResponse:
-    profile = _require_psychologist(request)
-    bond = Bond.objects.create(psychologist=profile)
+    profile = _require_provider(request)
+    form = CreateInviteForm(request.POST)
+    if not form.is_valid():
+        bonds = Bond.objects.for_provider(profile).order_by("-invited_at")
+        return render(
+            request,
+            "bonds/provider_dashboard.html",
+            {"bonds": bonds, "BondStatus": BondStatus, "invite_form": form},
+        )
+
+    bond = form.save(commit=False)
+    bond.provider = profile
+    bond.save()
+
+    label_suffix = f" para {bond.invitee_label}" if bond.invitee_label else ""
     messages.success(
         request,
-        f"Convite gerado. Código: {bond.invite_code}",
+        f"Convite gerado{label_suffix}. Código: {bond.invite_code}",
     )
-    return redirect("bonds:psychologist_dashboard")
+    return redirect("bonds:provider_dashboard")
 
 
 @login_required
 @require_POST
 def confirm_bond(request: HttpRequest, bond_id: int) -> HttpResponse:
-    profile = _require_psychologist(request)
+    profile = _require_provider(request)
     bond = get_object_or_404(
-        Bond.objects.for_psychologist(profile),
+        Bond.objects.for_provider(profile),
         pk=bond_id,
     )
     try:
@@ -91,20 +113,33 @@ def confirm_bond(request: HttpRequest, bond_id: int) -> HttpResponse:
         messages.error(request, str(exc))
     else:
         messages.success(request, "Vínculo confirmado.")
-    return redirect("bonds:psychologist_dashboard")
+    return redirect("bonds:provider_dashboard")
 
 
 # ---------- paciente ----------
+
 
 @login_required
 def patient_dashboard(request: HttpRequest) -> HttpResponse:
     profile = _require_patient(request)
     alive_bond = Bond.objects.for_patient(profile).alive().first()
     form = EnterInviteCodeForm() if alive_bond is None else None
+    medications = Medication.objects.for_patient(profile).active().select_related(
+        "prescribed_by__user"
+    )
+    reported_medication = (
+        PatientReportedMedication.objects.for_patient(profile).order_by("-updated_at").first()
+    )
     return render(
         request,
         "bonds/patient_dashboard.html",
-        {"bond": alive_bond, "form": form, "BondStatus": BondStatus},
+        {
+            "bond": alive_bond,
+            "form": form,
+            "BondStatus": BondStatus,
+            "medications": medications,
+            "reported_medication": reported_medication,
+        },
     )
 
 
@@ -137,6 +172,7 @@ def enter_invite(request: HttpRequest) -> HttpResponse:
 
 # ---------- ações comuns (encerrar de qualquer lado) ----------
 
+
 @login_required
 @require_POST
 def end_bond(request: HttpRequest, bond_id: int) -> HttpResponse:
@@ -151,6 +187,6 @@ def end_bond(request: HttpRequest, bond_id: int) -> HttpResponse:
 
 
 def _back_to_dashboard(request: HttpRequest) -> HttpResponseRedirect:
-    if request.user.is_psychologist:
-        return redirect("bonds:psychologist_dashboard")
+    if request.user.is_provider:
+        return redirect("bonds:provider_dashboard")
     return redirect("bonds:patient_dashboard")

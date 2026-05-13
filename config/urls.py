@@ -12,7 +12,9 @@ urlpatterns = [
         name="login",
     ),
     path("logout/", LogoutView.as_view(next_page="login"), name="logout"),
+    path("", include("apps.accounts.urls", namespace="accounts")),
     path("", include("apps.ai.urls", namespace="ai")),
     path("", include("apps.journal.urls", namespace="journal")),
     path("", include("apps.bonds.urls", namespace="bonds")),
+    path("", include("apps.clinical.urls", namespace="clinical")),
 ]
