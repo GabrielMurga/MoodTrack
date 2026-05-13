@@ -17,4 +17,5 @@ urlpatterns = [
     path("", include("apps.journal.urls", namespace="journal")),
     path("", include("apps.bonds.urls", namespace="bonds")),
     path("", include("apps.clinical.urls", namespace="clinical")),
+    path("", include("apps.billing.urls", namespace="billing")),
 ]

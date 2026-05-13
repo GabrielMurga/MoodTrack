@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Pagamento recebido — MoodTrack{% endblock %}
+
+{% block content %}
+<h1>Pagamento recebido</h1>
+
+<div class="card">
+  <p>
+    Recebemos a confirmação do seu pagamento na Stripe. O acesso ao plano
+    será liberado em segundos, assim que processarmos a confirmação.
+  </p>
+  <p style="color: #666; font-size: 0.9rem;">
+    Plano atual: <strong>{{ provider.get_plan_display }}</strong> · atualiza
+    automaticamente quando a Stripe confirmar.
+  </p>
+</div>
+
+<p style="margin-top: 1.2rem;">
+  <a href="{% url 'billing:dashboard' %}"><button>Voltar para meu plano</button></a>
+</p>
+{% endblock %}

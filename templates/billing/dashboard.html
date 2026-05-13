@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Meu plano — MoodTrack{% endblock %}
+
+{% block content %}
+<h1>Meu plano</h1>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: flex; align-items: center; gap: 0.6rem;">
+    <strong>Plano atual:</strong>
+    <span class="status-badge status-active">{{ provider.get_plan_display }}</span>
+  </div>
+  {% if provider.stripe_subscription_id %}
+    <p style="margin-top: 0.6rem; color: #666; font-size: 0.9rem;">
+      Assinatura ativa. Gerencie pagamento, troca de plano ou cancelamento no portal.
+    </p>
+    <form method="post" action="{% url 'billing:open_portal' %}" style="margin-top: 0.6rem;">
+      {% csrf_token %}
+      <button type="submit">Gerenciar assinatura</button>
+    </form>
+  {% endif %}
+</div>
+
+{% if provider.plan == ProviderPlan.BASIC.value %}
+  <h2>Faça upgrade</h2>
+  <p style="color: #666;">
+    Os planos pagos liberam o uso da IA — geração de resumos para pacientes e
+    briefings pré-sessão. Limite de uso mensal aplica-se conforme o plano.
+  </p>
+
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+    <div class="card">
+      <h3 style="margin-top: 0;">Pro</h3>
+      <p style="font-size: 1.4rem; margin: 0.3rem 0;"><strong>R$ 50</strong>/mês</p>
+      <ul style="color: #555; padding-left: 1.2rem;">
+        <li>IA habilitada (modelo otimizado)</li>
+        <li>Briefings pré-sessão</li>
+        <li>Resumos semanais para pacientes vinculados</li>
+        <li>Limite mensal: R$ 50 em uso real</li>
+      </ul>
+      <form method="post" action="{% url 'billing:create_checkout' %}">
+        {% csrf_token %}
+        <input type="hidden" name="plan" value="pro">
+        <button type="submit" style="width: 100%;">Assinar Pro</button>
+      </form>
+    </div>
+
+    <div class="card" style="border: 2px solid #2d6a3d;">
+      <h3 style="margin-top: 0;">Premium</h3>
+      <p style="font-size: 1.4rem; margin: 0.3rem 0;"><strong>R$ 200</strong>/mês</p>
+      <ul style="color: #555; padding-left: 1.2rem;">
+        <li>IA com modelo de maior qualidade</li>
+        <li>Análise completa sem truncamento</li>
+        <li>Briefings detalhados</li>
+        <li>Limite mensal: R$ 200 (uso ilimitado na prática)</li>
+      </ul>
+      <form method="post" action="{% url 'billing:create_checkout' %}">
+        {% csrf_token %}
+        <input type="hidden" name="plan" value="premium">
+        <button type="submit" style="width: 100%;">Assinar Premium</button>
+      </form>
+    </div>
+  </div>
+{% else %}
+  <h2>Trocar de plano</h2>
+  <p style="color: #666;">
+    Você está no plano {{ provider.get_plan_display }}. Para trocar de plano,
+    use o portal de gerenciamento — Stripe ajusta a cobrança automaticamente.
+  </p>
+{% endif %}
+{% endblock %}

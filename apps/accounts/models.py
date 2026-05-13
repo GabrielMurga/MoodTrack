@@ -200,8 +200,24 @@ class HealthcareProvider(models.Model):
         default=ProviderPlan.BASIC,
         help_text=_(
             "Tier de assinatura. Define acesso a IA e cota — ver ADR 0010. "
-            "Profissional novo nasce em Básico (sem IA) por default."
+            "Profissional novo nasce em Básico (sem IA) por default. "
+            "Alterado apenas via webhook da Stripe (ADR 0012)."
         ),
+    )
+
+    # ADR 0012 — billing via Stripe. Lazy: customer só é criado quando o
+    # profissional tenta assinar pela primeira vez. Subscription só após
+    # checkout.session.completed processado pelo webhook.
+    stripe_customer_id = models.CharField(
+        _("Stripe customer id"),
+        max_length=64,
+        blank=True,
+        db_index=True,
+    )
+    stripe_subscription_id = models.CharField(
+        _("Stripe subscription id"),
+        max_length=64,
+        blank=True,
     )
 
     created_at = models.DateTimeField(_("criado em"), auto_now_add=True)

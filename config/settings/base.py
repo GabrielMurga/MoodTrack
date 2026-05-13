@@ -46,6 +46,16 @@ AI_PRO_MONTHLY_LIMIT_BRL = Decimal("50.00")
 AI_PREMIUM_MONTHLY_LIMIT_BRL = Decimal("200.00")
 
 
+# Billing — Stripe (ADR 0012).
+# Chaves de TEST mode em desenvolvimento (sk_test_..., whsec_...).
+# Produção exige migração manual (verificação de conta + produtos reais).
+STRIPE_API_KEY = env("STRIPE_API_KEY", default="")
+STRIPE_WEBHOOK_SECRET = env("STRIPE_WEBHOOK_SECRET", default="")
+# Price IDs criados manualmente no Stripe Dashboard. Mapeiam pra ProviderPlan.
+STRIPE_PRO_PRICE_ID = env("STRIPE_PRO_PRICE_ID", default="")
+STRIPE_PREMIUM_PRICE_ID = env("STRIPE_PREMIUM_PRICE_ID", default="")
+
+
 # Applications
 DJANGO_APPS = [
     "django.contrib.admin",
@@ -73,6 +83,7 @@ LOCAL_APPS = [
     "apps.journal",
     "apps.ai",
     "apps.clinical",
+    "apps.billing",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

@@ -17,6 +17,7 @@ dependencies = [
     "django-cryptography-5>=2.0,<3",
     "anthropic>=0.40,<1",
     "spacy>=3.8,<4",
+    "stripe>=11,<13",
 ]
 
 [dependency-groups]

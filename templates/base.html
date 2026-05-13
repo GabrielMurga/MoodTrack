@@ -33,6 +33,7 @@
       {% if user.is_provider %}
         <a href="{% url 'bonds:provider_dashboard' %}">Vínculos</a>
         <a href="{% url 'journal:provider_patients' %}">Pacientes</a>
+        <a href="{% url 'billing:dashboard' %}">Plano</a>
       {% endif %}
       {% if user.is_patient %}
         <a href="{% url 'bonds:patient_dashboard' %}">Vínculo</a>
